@@ -19,7 +19,7 @@ if (!require("stats")) install.packages("stats")
 library(stats)
 
 registerDoParallel(numCores)
-seed(1)
+setSeed(1)
 
 #bootsize for bootstrap approximation of the distributions of the kernel of U-statistics.
 n <- 1.8*10^4
