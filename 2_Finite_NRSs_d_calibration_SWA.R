@@ -15,7 +15,7 @@ numCores <- detectCores()
 #registering clusters, can set a smaller number using numCores-1 
 
 registerDoParallel(numCores)
-
+seed(1)
 
 #bootsize for bootstrap approximation of the distributions of the kernel of U-statistics.
 n <- 1.8*10^4
