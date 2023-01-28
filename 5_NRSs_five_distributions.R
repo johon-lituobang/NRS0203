@@ -1800,7 +1800,7 @@ simulatedbatchWeibull_asymptoticbias<-foreach(batchnumber = (1:length(allkurtWei
 
 write.csv(simulatedbatchWeibull_asymptoticbias,paste("asymptotic_Weibull_raw_Process",largesize,".csv", sep = ","), row.names = FALSE)
 
-write.csv(cbind(simulatedbatchWeibull_asymptoticbias[1:length(allkurtWeibull),1],simulatedbatchWeibull_asymptoticbias[1:length(allkurtWeibull),209:408]),paste("asymptotic_Weibull ",largesize,".csv", sep = ","), row.names = FALSE)
+write.csv(cbind(simulatedbatchWeibull_asymptoticbias[1:length(allkurtWeibull),1],simulatedbatchWeibull_asymptoticbias[1:length(allkurtWeibull),209:408]),paste("asymptotic_Weibull",largesize,".csv", sep = ","), row.names = FALSE)
 
 
 samplesize=5400
