@@ -170,6 +170,20 @@ unbiasedmoments<-function (x){
   listall<-c(mean=m1,variance=var1,tm=tm1,fm=ufm1)
   (listall)
 }
+se_mean<-function (x){
+  n<-length(x)
+  usd<-unbiasedsd(x)
+  usd/sqrt(n)
+}
+se_sd<-function (x){
+  n<-length(x)
+  m1<-mean(x)
+  var1<-sd(x)^2
+  var2<-(sum((x - m1)^2)/n)
+  fm1<-(sum((x - m1)^4)/n)
+  ufm1<--3*var2^2*(2*n-3)*n/((n-1)*(n-2)*(n-3))+(n^2-2*n+3)*fm1*n/((n-1)*(n-2)*(n-3))
+  sqrt((ufm1/(4*n*var1))-((n-3)/(4*n*(n-1)))*var1)
+}
 
 standardizedmoments<-function (x){
   n<-length(x)
@@ -682,7 +696,20 @@ allkurtWeibull<-unlist(kurtWeibull)
 
 samplesize=5400
 
-batchsizebase=1000
+orderlist1_AB2<-removelist(na.omit(t(apply(quasiuni_sorted2,MARGIN=1,FUN=roundunique,dimension=2,size=samplesize))))
+orderlist1_AB3<-removelist(na.omit(t(apply(quasiuni_sorted3,MARGIN=1,FUN=roundunique,dimension=3,size=samplesize))))
+orderlist1_AB4<-removelist(na.omit(t(apply(quasiuni_sorted4,MARGIN=1,FUN=roundunique,dimension=4,size=samplesize))))
+
+batchsizebase=500
+
+batchsize=(batchsizebase)
+
+n <- samplesize
+
+setSeed(1)
+unibatchran<-matrix(SFMT(samplesize*batchsize),ncol=batchsize)
+
+unibatch<-colSort(unibatchran, descend = FALSE, stable = FALSE, parallel = TRUE)
 
 #Then, start the Monte Simulation
 simulatedbatchWeibull_bias_Monte<-foreach(batchnumber =c((1:length(allkurtWeibull))), .combine = 'rbind') %dopar% {
@@ -702,10 +729,6 @@ simulatedbatchWeibull_bias_Monte<-foreach(batchnumber =c((1:length(allkurtWeibul
   if (!require("gnorm")) install.packages("gnorm")
   library(gnorm)
   
-  orderlist1_AB2<-removelist(na.omit(t(apply(quasiuni_sorted2,MARGIN=1,FUN=roundunique,dimension=2,size=samplesize))))
-  orderlist1_AB3<-removelist(na.omit(t(apply(quasiuni_sorted3,MARGIN=1,FUN=roundunique,dimension=3,size=samplesize))))
-  orderlist1_AB4<-removelist(na.omit(t(apply(quasiuni_sorted4,MARGIN=1,FUN=roundunique,dimension=4,size=samplesize))))
-  
   a=allkurtWeibull[batchnumber]
   
   targetm<-gamma(1+1/(a/1))
@@ -715,14 +738,6 @@ simulatedbatchWeibull_bias_Monte<-foreach(batchnumber =c((1:length(allkurtWeibul
   kurtx<-targetfm/(targetvar^(4/2))
   kurtx<-c(kurtx=kurtx)
   
-  batchsize=round(batchsizebase/(kurtx^(1/4)))
-  
-  n <- samplesize
-    
-  unibatchran<-matrix(SFMT(samplesize*batchsize),ncol=batchsize)
-    
-  unibatch<-colSort(unibatchran, descend = FALSE, stable = FALSE, parallel = TRUE)
-    
   SEbataches<-c()
   for (batch1 in c(1:batchsize)){
       
@@ -823,10 +838,10 @@ simulatedbatchWeibull_bias_Monte_SE<-foreach(batchnumber =c((1:length(allkurtWei
   kurtx<-targetfm/(targetvar^(4/2))
   kurtx<-c(kurtx=kurtx)
   
-  batchsize=batchsizebase/(kurtx^(1/4))
+  batchsize=batchsizebase
   
   SEbataches<- read.csv(paste("Weibull_raw_d_calibration",samplesize,round(kurtx,digits = 1),".csv", sep = ","))
-  standarderrors1<-apply(SEbataches,2,unbiasedsd)/sqrt(batchsize)
+  standarderrors1<-apply(SEbataches,2,se_mean)
   standarderrors1
 }
 Allstandarderror_each<-cbind(meanall[,1:2],simulatedbatchWeibull_bias_Monte_SE[,3:ncol(simulatedbatchWeibull_bias_Monte_SE)])
