@@ -203,6 +203,20 @@ kurtosis<-function (x){
   listall<-c(kurtosis=fm1/sd1^4)
   (listall)
 }
+se_mean<-function (x){
+  n<-length(x)
+  usd<-unbiasedsd(x)
+  usd/sqrt(n)
+}
+se_sd<-function (x){
+  n<-length(x)
+  m1<-mean(x)
+  var1<-sd(x)^2
+  var2<-(sum((x - m1)^2)/n)
+  fm1<-(sum((x - m1)^4)/n)
+  ufm1<--3*var2^2*(2*n-3)*n/((n-1)*(n-2)*(n-3))+(n^2-2*n+3)*fm1*n/((n-1)*(n-2)*(n-3))
+  sqrt((ufm1/(4*n*var1))-((n-3)/(4*n*(n-1)))*var1)
+}
 greatest_common_divisor<- function(a, b) {
   if (b == 0) a else Recall(b, a %% b)
 }
@@ -1454,10 +1468,19 @@ kurtWeibull<- read.csv(("kurtWeibull_28260.csv"))
 allkurtWeibull<-unlist(kurtWeibull)
 
 samplesize=5400
-batchsizebase=1000
+batchsizebase=500
+
 orderlist1_AB2<-removelist(na.omit(t(apply(quasiuni_sorted2,MARGIN=1,FUN=roundunique,dimension=2,size=samplesize))))
 orderlist1_AB3<-removelist(na.omit(t(apply(quasiuni_sorted3,MARGIN=1,FUN=roundunique,dimension=3,size=samplesize))))
 orderlist1_AB4<-removelist(na.omit(t(apply(quasiuni_sorted4,MARGIN=1,FUN=roundunique,dimension=4,size=samplesize))))
+
+batchsize=500
+
+n <- samplesize
+setSeed(1)
+unibatchran<-matrix(SFMT(samplesize*batchsize),ncol=batchsize)
+
+unibatch<-colSort(unibatchran, descend = FALSE, stable = FALSE, parallel = TRUE)
 
 #Then, start the Monte Simulation
 simulatedbatchWeibull_bias_Monte<-foreach(batchnumber =c((1:length(allkurtWeibull))), .combine = 'rbind') %dopar% {
@@ -1486,14 +1509,6 @@ simulatedbatchWeibull_bias_Monte<-foreach(batchnumber =c((1:length(allkurtWeibul
   targetfm<-((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^4)*(gamma(1+4/(a/1))-4*(gamma(1+3/(a/1)))*((gamma(1+1/(a/1))))+6*(gamma(1+2/(a/1)))*((gamma(1+1/(a/1)))^2)-3*((gamma(1+1/(a/1)))^4))/(((gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^(2))
   kurtx<-targetfm/(targetvar^(4/2))
   kurtx<-c(kurtx=kurtx)
-  
-  batchsize=ceiling(batchsizebase/(kurtx^(1/4)))
-  
-  n <- samplesize
-  
-  unibatchran<-matrix(SFMT(samplesize*batchsize),ncol=batchsize)
-  
-  unibatch<-colSort(unibatchran, descend = FALSE, stable = FALSE, parallel = TRUE)
   
   SEbataches<-c()
   for (batch1 in c(1:batchsize)){
@@ -1606,4 +1621,77 @@ colnames(Asymptotic_Weibull)<-colnames(Label_ABSE_Weibull1)
 AllFinal_Weibull<-rbind(Optimum_ABSE,Asymptotic_Weibull)
 
 write.csv(AllFinal_Weibull,paste("ABSSE_w_Weibull_SWA.csv", sep = ","), row.names = FALSE)
+
+
+simulatedbatchWeibull_bias_Monte_SE<-foreach(batchnumber =c((1:length(allkurtWeibull))), .combine = 'rbind') %dopar% {
+  library(Rfast)
+  if (!require("foreach")) install.packages("foreach")
+  library(foreach)
+  if (!require("doParallel")) install.packages("doParallel")
+  library(doParallel)
+  #registering clusters, can set a smaller number using numCores-1 
+  
+  #require randtoolbox for random number generations
+  if (!require("randtoolbox")) install.packages("randtoolbox")
+  library(randtoolbox)
+  #require Rfast for faster computation
+  if (!require("Rfast")) install.packages("Rfast")
+  library(Rfast)
+  if (!require("gnorm")) install.packages("gnorm")
+  library(gnorm)
+  
+  
+  a=allkurtWeibull[batchnumber]
+  
+  targetm<-gamma(1+1/(a/1))
+  targetvar<-(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2)
+  targettm<-((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^3)*(gamma(1+3/(a/1))-3*(gamma(1+1/(a/1)))*((gamma(1+2/(a/1))))+2*((gamma(1+1/(a/1)))^3))/((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^(3))
+  targetfm<-((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^4)*(gamma(1+4/(a/1))-4*(gamma(1+3/(a/1)))*((gamma(1+1/(a/1))))+6*(gamma(1+2/(a/1)))*((gamma(1+1/(a/1)))^2)-3*((gamma(1+1/(a/1)))^4))/(((gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^(2))
+  kurtx<-targetfm/(targetvar^(4/2))
+  kurtx<-c(kurtx=kurtx)
+
+  SEbataches<- read.csv(paste("Weibull_raw_w_calibration_finite",samplesize,round(kurtx,digits = 1),".csv", sep = ","))
+  
+  SEbatachesmean <- colMeans(SEbataches)
+  
+  ratiomean1<-c(SEbatachesmean[2:49])/SEbatachesmean[6]
+  
+  meansd_unscaled1<-apply((SEbataches[1:batchsize,2:49]), 2, se_sd)
+  
+  mean_SEbatachesmeanprocess<-t(t(SEbataches[1:batchsize,2:49])/ratiomean1)
+  
+  meansd1<-apply(mean_SEbatachesmeanprocess, 2, se_sd)
+  ratiovar1<-SEbatachesmean[50:93]/SEbatachesmean[50]
+  
+  varsd_unscaled1<-apply((SEbataches[1:batchsize,50:93]), 2, se_sd)
+  
+  var_SEbatachesvarprocess<-(t(t(SEbataches[1:batchsize,50:93])/ratiovar1))
+  
+  varsd1<-apply(var_SEbatachesvarprocess, 2, se_sd)
+  
+  ratiotm1<-SEbatachesmean[94:137]/SEbatachesmean[94]
+  
+  tmsd_unscaled1<-apply((SEbataches[1:batchsize,94:137]), 2, se_sd)
+  
+  tm_SEbatachestmprocess<-(t(t(SEbataches[1:batchsize,94:137])/ratiotm1))
+  tmsd1<-apply(tm_SEbatachestmprocess, 2, se_sd)
+  
+  ratiofm1<-SEbatachesmean[138:181]/SEbatachesmean[138]
+  fmsd_unscaled1<-apply((SEbataches[1:batchsize,138:181]), 2, se_sd)
+  
+  
+  fm_SEbatachesfmprocess<-(t(t(SEbataches[1:batchsize,138:181])/ratiofm1))
+  fmsd1<-apply(fm_SEbatachesfmprocess, 2, se_sd)
+  
+  allSE_unstandardized_se_sd<-c(meansd_unscaled1=meansd_unscaled1,varsd_unscaled1=varsd_unscaled1,tmsd_unscaled1=tmsd_unscaled1,fmsd_unscaled1=fmsd_unscaled1
+  )
+  allSSE_unstandardized_se_sd<-c(meansd1=meansd1,varsd1=varsd1,tmsd1=tmsd1,fmsd1=fmsd1
+  )
+  se_mean_all1<-apply((SEbataches[1:batchsize,]), 2, se_mean)
+  allresultsSE<-c(samplesize,SEbatachesmean,se_mean_all1=se_mean_all1,SE_se=allSE_unstandardized_se_sd,SSE_se=allSSE_unstandardized_se_sd)
+  
+  allresultsSE
+}
+
+write.csv(simulatedbatchWeibull_bias_Monte_SE,paste("ABSSE_w_Weibull_SWA_finite_error.csv", sep = ","), row.names = FALSE)
 
