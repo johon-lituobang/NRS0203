@@ -700,7 +700,7 @@ orderlist1_AB2<-removelist(na.omit(t(apply(quasiuni_sorted2,MARGIN=1,FUN=roundun
 orderlist1_AB3<-removelist(na.omit(t(apply(quasiuni_sorted3,MARGIN=1,FUN=roundunique,dimension=3,size=samplesize))))
 orderlist1_AB4<-removelist(na.omit(t(apply(quasiuni_sorted4,MARGIN=1,FUN=roundunique,dimension=4,size=samplesize))))
 
-batchsizebase=500
+batchsizebase=2000
 
 batchsize=(batchsizebase)
 

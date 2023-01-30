@@ -10,8 +10,6 @@ if (!require("randtoolbox")) install.packages("randtoolbox")
 library(randtoolbox)
 if (!require("Rfast")) install.packages("Rfast")
 library(Rfast)
-if (!require("gnorm")) install.packages("gnorm")
-library(gnorm)
 
 numCores <- detectCores()
 #registering clusters, can set a smaller number using numCores-1 
@@ -148,11 +146,6 @@ dsgamma<-function (uni,shape,scale = 1) {
 }
 dsWeibull<-function (uni,shape, scale = 1){
   sample1<-qweibull(uni,shape=shape, scale = scale)
-  sample1
-}
-dsgnorm<-function (uni,shape, scale = 1){
-  library(gnorm)
-  sample1<-qgnorm(p=uni, mu = 0, alpha = scale, beta = shape)
   sample1
 }
 
@@ -380,6 +373,7 @@ findd<-function(expectanalytic=NULL,expecttrue=NULL,expectboot=NULL,SWA1=NULL,me
     dqm1analytic<-(quatileexpectanalytic-mx1)/(mx1-0.5)
     dqm1true<-(quatileexpecttrue-mx1)/(mx1-0.5)
   }
+  
   drm1boot<-(expectboot-SWA1)/(SWA1-median1)
   drm1analytic<-(expectanalytic-SWA1)/(SWA1-median1)
   drm1true<-(expecttrue-SWA1)/(SWA1-median1)
@@ -663,6 +657,7 @@ finddall<-function (x,targetm,targetvar,targettm,targetfm,orderlist1_sorted2=NUL
 kurtWeibull<- read.csv(("kurtWeibull_28260.csv"))
 allkurtWeibull<-unlist(kurtWeibull)
 
+
 simulatedbatchWeibull_bias<-foreach(batchnumber = (1:length(allkurtWeibull)), .combine = 'rbind') %dopar% {
   library(Rfast)
   a=allkurtWeibull[batchnumber]
@@ -672,159 +667,21 @@ simulatedbatchWeibull_bias<-foreach(batchnumber = (1:length(allkurtWeibull)), .c
   targettm<-((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^3)*(gamma(1+3/(a/1))-3*(gamma(1+1/(a/1)))*((gamma(1+2/(a/1))))+2*((gamma(1+1/(a/1)))^3))/((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^(3))
   targetfm<-((sqrt(gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^4)*(gamma(1+4/(a/1))-4*(gamma(1+3/(a/1)))*((gamma(1+1/(a/1))))+6*(gamma(1+2/(a/1)))*((gamma(1+1/(a/1)))^2)-3*((gamma(1+1/(a/1)))^4))/(((gamma(1+2/(a/1))-(gamma(((1+1/(a/1)))))^2))^(2))
   kurtx<-targetfm/(targetvar^(4/2))
-  skewx<-targettm/(targetvar^(3/2))
-  
+  kurtx<-c(kurtx=kurtx)
   sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
   x<-c()
   dall<-finddall(x=sortedx,targetm=targetm,targetvar=targetvar,targettm=targettm,targetfm=targetfm,orderlist1_sorted2=orderlist1_AB2,orderlist1_sorted3=orderlist1_AB3,orderlist1_sorted4=orderlist1_AB4,interval=8,fast=TRUE,batch="auto")
   sortedx<-c()
-  all1<-t(c(kurtx,skewx,dall))
+  all1<-t(c(kurtx,dall))
 }
 
 write.csv(simulatedbatchWeibull_bias,paste("asymptotic_Weibull_ds_raw_dcalibration_SWA",largesize,".csv", sep = ","), row.names = FALSE)
 
-asymptotic_d_Weibull<-simulatedbatchWeibull_bias[,c(1,2,seq(from=5, to=170, by=3))]
+asymptotic_d_Weibull<-simulatedbatchWeibull_bias[,c(1,seq(from=4, to=169, by=3))]
 
 #colnames(asymptotic_d_Weibull)<-c("kurtosis","rm","qm","rvar","qvar","rtm","qtm","rfm","qfm")
   
 write.csv(asymptotic_d_Weibull,paste("asymptotic_d_Weibull_SWA.csv", sep = ","), row.names = FALSE)
-
-
-
-kurtgamma<- read.csv(("kurtgamma_31260.csv"))
-allkurtgamma<-unlist(kurtgamma)
-
-simulatedbatchgamma_bias<-foreach(batchnumber = (1:length(allkurtgamma)), .combine = 'rbind') %dopar% {
-  library(Rfast)
-  a=allkurtgamma[batchnumber]
-  x<-c(dsgamma(uni=quasiuni, shape=a, scale = 1))
-  targetm<-a
-  targetvar<-(a)
-  targettm<-((sqrt(a))^3)*2/sqrt(a)
-  targetfm<-((sqrt(a))^4)*((6/(a))+3)
-  kurtx<-targetfm/(targetvar^(4/2))
-  skewx<-targettm/(targetvar^(3/2))
-  
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
-  x<-c()
-  dall<-finddall(x=sortedx,targetm=targetm,targetvar=targetvar,targettm=targettm,targetfm=targetfm,orderlist1_sorted2=orderlist1_AB2,orderlist1_sorted3=orderlist1_AB3,orderlist1_sorted4=orderlist1_AB4,interval=8,fast=TRUE,batch="auto")
-  sortedx<-c()
-  all1<-t(c(kurtx,skewx,dall))
-}
-
-write.csv(simulatedbatchgamma_bias,paste("asymptotic_gamma_ds_raw_dcalibration_SWA",largesize,".csv", sep = ","), row.names = FALSE)
-
-asymptotic_d_gamma<-simulatedbatchgamma_bias[,c(1,2,seq(from=5, to=170, by=3))]
-
-write.csv(asymptotic_d_gamma,paste("asymptotic_d_gamma_SWA.csv", sep = ","), row.names = FALSE)
-
-
-#Pareto
-kurtPareto<- read.csv(("kurtPareto_91260.csv"))
-allkurtPareto<-unlist(kurtPareto)
-
-simulatedbatchPareto_bias<-foreach(batchnumber = (1:length(allkurtPareto)), .combine = 'rbind') %dopar% {
-  library(Rfast)
-  a=allkurtPareto[batchnumber]
-  x<-c(dsPareto(uni=quasiuni, shape=a, scale = 1))
-  targetm<-a/(a-1)
-  targetvar<-(((a))*(1)/((-2+(a))*((-1+(a))^2)))
-  targettm<-((((a)+1)*(2)*(sqrt(a-2)))/((-3+(a))*(((a))^(1/2))))*(((sqrt(((a))*(1)/((-2+(a))*((-1+(a))^2))))^3))
-  targetfm<-(3+(6*((a)^3+(a)^2-6*(a)-2)/(((a))*((-3+(a)))*((-4+(a))))))*((sqrt(((a))*(1)/((-2+(a))*((-1+(a))^2))))^4)
-  kurtx<-targetfm/(targetvar^(4/2))
-  skewx<-targettm/(targetvar^(3/2))
-  
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
-  x<-c()
-  dall<-finddall(x=sortedx,targetm=targetm,targetvar=targetvar,targettm=targettm,targetfm=targetfm,orderlist1_sorted2=orderlist1_AB2,orderlist1_sorted3=orderlist1_AB3,orderlist1_sorted4=orderlist1_AB4,interval=8,fast=TRUE,batch="auto")
-  sortedx<-c()
-  all1<-t(c(kurtx,skewx,dall))
-}
-
-write.csv(simulatedbatchPareto_bias,paste("asymptotic_Pareto_ds_raw_dcalibration_SWA",largesize,".csv", sep = ","), row.names = FALSE)
-
-asymptotic_d_Pareto<-simulatedbatchPareto_bias[,c(1,2,seq(from=5, to=170, by=3))]
-
-#colnames(asymptotic_d_Weibull)<-c("kurtosis","rm","qm","rvar","qvar","rtm","qtm","rfm","qfm")
-
-write.csv(asymptotic_d_Pareto,paste("asymptotic_d_Pareto_SWA.csv", sep = ","), row.names = FALSE)
-
-
-kurtlognorm<- read.csv(("kurtlognorm_31260.csv"))
-allkurtlognorm<-unlist(kurtlognorm)
-
-
-simulatedbatchlognorm_bias<-foreach(batchnumber = (1:length(allkurtlognorm)), .combine = 'rbind') %dopar% {
-  library(Rfast)
-  a=allkurtlognorm[batchnumber]
-  x<-c(dslnorm(uni=quasiuni, location=0, scale = a/1))
-  targetm<-exp((a^2)/2)
-  targetvar<-(exp((a/1)^2)*(-1+exp((a/1)^2)))
-  targettm<-sqrt(exp((a/1)^2)-1)*((2+exp((a/1)^2)))*((sqrt(exp((a/1)^2)*(-1+exp((a/1)^2))))^3)
-  targetfm<-((-3+exp(4*((a/1)^2))+2*exp(3*((a/1)^2))+3*exp(2*((a/1)^2))))*((sqrt(exp((a/1)^2)*(-1+exp((a/1)^2))))^4)
-  kurtx<-targetfm/(targetvar^(4/2))
-  skewx<-targettm/(targetvar^(3/2))
-  
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
-  x<-c()
-  dall<-finddall(x=sortedx,targetm=targetm,targetvar=targetvar,targettm=targettm,targetfm=targetfm,orderlist1_sorted2=orderlist1_AB2,orderlist1_sorted3=orderlist1_AB3,orderlist1_sorted4=orderlist1_AB4,interval=8,fast=TRUE,batch="auto")
-  sortedx<-c()
-  all1<-t(c(kurtx,skewx,dall))
-}
-
-write.csv(simulatedbatchlognorm_bias,paste("asymptotic_lognorm_ds_raw_dcalibration_SWA",largesize,".csv", sep = ","), row.names = FALSE)
-
-asymptotic_d_lognorm<-simulatedbatchlognorm_bias[,c(1,2,seq(from=5, to=170, by=3))]
-
-#colnames(asymptotic_d_Weibull)<-c("kurtosis","rm","qm","rvar","qvar","rtm","qtm","rfm","qfm")
-
-write.csv(asymptotic_d_lognorm,paste("asymptotic_d_lognorm_SWA.csv", sep = ","), row.names = FALSE)
-
-
-kurtgnorm<- read.csv(("kurtgnorm_21260.csv"))
-allkurtgnorm<-unlist(kurtgnorm)
-
-simulatedbatchgnorm_bias<-foreach(batchnumber = (1:length(allkurtgnorm)), .combine = 'rbind') %dopar% {
-  library(Rfast)
-  a=allkurtgnorm[batchnumber]
-  x<-c(dsgnorm(uni=quasiuni, shape=a, scale = 1))
-  targetm<-0
-  targetvar<-gamma(3/a)/((gamma(1/a)))
-  targettm<-0
-  targetfm<-((gamma(3/a)/((gamma(1/a))))^2)*gamma(5/a)*gamma(1/a)/((gamma(3/a))^2)
-  kurtx<-targetfm/(targetvar^(4/2))
-  skewx<-targettm/(targetvar^(3/2))
-  
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
-  x<-c()
-  dall<-finddall(x=sortedx,targetm=targetm,targetvar=targetvar,targettm=targettm,targetfm=targetfm,orderlist1_sorted2=orderlist1_AB2,orderlist1_sorted3=orderlist1_AB3,orderlist1_sorted4=orderlist1_AB4,interval=8,fast=TRUE,batch="auto")
-  sortedx<-c()
-  all1<-t(c(kurtx,skewx,dall))
-}
-
-write.csv(simulatedbatchgnorm_bias,paste("asymptotic_gnorm_ds_raw_dcalibration_SWA",largesize,".csv", sep = ","), row.names = FALSE)
-
-asymptotic_d_gnorm<-simulatedbatchgnorm_bias[,c(1,2,seq(from=5, to=170, by=3))]
-asymptotic_d_gnorm[,c(3:16,31:44)]<-0
-#colnames(asymptotic_d_Weibull)<-c("kurtosis","rm","qm","rvar","qvar","rtm","qtm","rfm","qfm")
-
-write.csv(asymptotic_d_gnorm,paste("asymptotic_d_gnorm_SWA.csv", sep = ","), row.names = FALSE)
-
-asymptotic_d_Merged <- do.call("rbind", list(asymptotic_d_Weibull, asymptotic_d_gamma, asymptotic_d_Pareto, asymptotic_d_lognorm,asymptotic_d_gnorm))
-
-write.csv(asymptotic_d_Merged,paste("asymptotic_d_merged_SWA.csv", sep = ","), row.names = FALSE)
-
-# 
-# Asymptotic_Weibull<- read.csv(("asymptotic_d_merged_SWA.csv"))
-# 
-# Asymptotic_Weibull<- cbind(Size=rep(1800000,nrow(Asymptotic_Weibull)),Asymptotic_Weibull)
-# Label_Weibull1<- read.csv(("finite_d_label.csv"))
-# 
-# colnames(Asymptotic_Weibull)<-colnames(Label_Weibull1)
-# 
-# AllFinal_Weibull<-rbind(Asymptotic_Weibull)
-# 
-# write.csv(AllFinal_Weibull,paste("d_value_Weibull.csv", sep = ","), row.names = FALSE)
 
 registerDoSEQ()
 

@@ -1814,7 +1814,7 @@ write.csv(simulatedbatchWeibull_asymptoticbias,paste("asymptotic_Weibull_raw_Pro
 write.csv(cbind(simulatedbatchWeibull_asymptoticbias[1:length(allkurtWeibull),1],simulatedbatchWeibull_asymptoticbias[1:length(allkurtWeibull),209:408]),paste("asymptotic_Weibull",largesize,".csv", sep = ","), row.names = FALSE)
 
 samplesize=5400
-batchsizebase=500
+batchsizebase=2000
 orderlist1_AB2<-removelist(na.omit(t(apply(quasiuni_sorted2,MARGIN=1,FUN=roundunique,dimension=2,size=samplesize))))
 orderlist1_AB3<-removelist(na.omit(t(apply(quasiuni_sorted3,MARGIN=1,FUN=roundunique,dimension=3,size=samplesize))))
 orderlist1_AB4<-removelist(na.omit(t(apply(quasiuni_sorted4,MARGIN=1,FUN=roundunique,dimension=4,size=samplesize))))
