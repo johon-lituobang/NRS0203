@@ -711,17 +711,9 @@ Balltest<-function (x,orderlist1_sorted2=NULL,orderlist1_sorted3=NULL,orderlist1
       ((fmmo_BM_rm_Weibull1))/(varmo_BM_rm_Weibull1^2)
     }
     step1 <- 0
-    checklow<-Kappa1(2.8)-2.8
-    checkup<-Kappa1(26)-26
     
     if (((abs(kurt0-kurt1))<criterion)){
       
-    }else if ((checklow*checkup)>0){
-      if(checklow>0){
-        kurt1<-2.8
-      }else{
-        kurt1<-26
-      }
     }else{
       
       repeat {
@@ -729,7 +721,7 @@ Balltest<-function (x,orderlist1_sorted2=NULL,orderlist1_sorted3=NULL,orderlist1
         
         kurt2<-Kappa1(kurt1)
         
-        if ((abs(kurt1-kurt2))<criterion*1e-09 || (step1 == stepsize)){
+        if ((abs(kurt1-kurt2))<criterion || (step1 == stepsize)){
           
           break
         }
@@ -802,17 +794,10 @@ Balltest<-function (x,orderlist1_sorted2=NULL,orderlist1_sorted3=NULL,orderlist1
       fmmo_BM_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],dqm=fm_BM_dqm1)
       ((fmmo_BM_qm_Weibull1))/(varmo_BM_qm_Weibull1^2)
     }
-    checklow<-Kappa1(2.8)-2.8
-    checkup<-Kappa1(26)-26
+    
     step1 <- 0
     if (((abs(kurt0-kurt1))<criterion)){
       
-    }else if (checklow*checkup>0){
-      if(checklow>0){
-        kurt1<-2.8
-      }else{
-        kurt1<-26
-      }
     }else{
       repeat {
         step1 <-step1 + 1
