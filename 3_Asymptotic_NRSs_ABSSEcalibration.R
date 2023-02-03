@@ -234,7 +234,7 @@ data_augmentation<-function (x,targetsize){
   data_augmentationresult<-sapply(split(disori, group), mean)
   return(data_augmentationresult)
 }
-mediansorted<-function(sortedx,lengthx){
+mediansorted<-function(sortedx,lengthx=length(sortedx)){
   if (lengthx%%2==0){
     return((sortedx[lengthx/2]+sortedx[(lengthx/2)+1])/2)
   }
@@ -419,13 +419,13 @@ d_adjust<-function(size,kurt,dlist,type){
   indextypelist<-c("mean_BM_drm","mean_BM_dqm","mean_sqm_drm","mean_sqm_dqm","mean_wm1_drm","mean_wm1_dqm","mean_wm2_drm","mean_wm2_dqm","mean_tm1_drm","mean_tm1_dqm","mean_tm2_drm","mean_tm2_dqm","mean_tm3_drm","mean_tm3_dqm","var_BM_drm","var_BM_dqm","var_sqm_drm","var_sqm_dqm","var_wm1_drm","var_wm1_dqm","var_wm2_drm","var_wm2_dqm","var_tm1_drm","var_tm1_dqm","var_tm2_drm","var_tm2_dqm","var_tm3_drm","var_tm3_dqm","tm_BM_drm","tm_BM_dqm","tm_sqm_drm","tm_sqm_dqm","tm_wm1_drm","tm_wm1_dqm","tm_wm2_drm","tm_wm2_dqm","tm_tm1_drm","tm_tm1_dqm","tm_tm2_drm","tm_tm2_dqm","tm_tm3_drm","tm_tm3_dqm","fm_BM_drm","fm_BM_dqm","fm_sqm_drm","fm_sqm_dqm","fm_wm1_drm","fm_wm1_dqm","fm_wm2_drm","fm_wm2_dqm","fm_tm1_drm","fm_tm1_dqm","fm_tm2_drm","fm_tm2_dqm","fm_tm3_drm","fm_tm3_dqm")
   indextype<-which(indextypelist==(type))+2
   if(size%in% dlist[,1]){
-    if (kurt%in% dlist[,2]){
+    if (kurt%in% dlist[dlist[,1] == size,2]){
       result1<-dlist[dlist[,1] == size & dlist[,2]==kurt,indextype]
     }else{
-      rown2<-as.numeric(dlist[,2])
+      rown2<-as.numeric(dlist[dlist[,1] == size,2])
       infn2<-max(rown2[rown2 < kurt])
       if(is.infinite(infn2)){
-        infn2<-rown2[2]
+        infn2<-min(rown2)
         #print(c("The kurtosis is out of range supported.",kurt))
       }
       supn2<-min(rown2[rown2 > kurt])
@@ -445,17 +445,17 @@ d_adjust<-function(size,kurt,dlist,type){
     rown<-as.numeric(dlist[,1])
     infn<-max(rown[rown < size])
     if(is.infinite(infn)){
-      infn<-rown[1]
+      infn<-min(rown)
     }
     supn<-min(rown[rown > size])
     if(is.infinite(supn)){
       supn<-max(rown)
     }
     
-    rown2<-as.numeric(dlist[,2])
+    rown2<-as.numeric(dlist[dlist[,1] == infn,2])
     infn2<-max(rown2[rown2 < kurt])
     if(is.infinite(infn2)){
-      infn2<-rown2[2]
+      infn2<-min(rown2)
     }
     supn2<-min(rown2[rown2 > kurt])
     if(is.infinite(supn2)){
@@ -463,23 +463,50 @@ d_adjust<-function(size,kurt,dlist,type){
     }
     
     d1<-dlist[dlist[,1]==infn & dlist[,2]==infn2,indextype]
+    d2<-dlist[dlist[,1]==infn & dlist[,2]==supn2,indextype]
+  
+    if(d1==d2){
+      da<-d1
+    }else{
+      da<-(((d2-d1)*((kurt-infn2)/(supn2-infn2)))+d1)
+    }
+    
+    rown2<-as.numeric(dlist[dlist[,1] == supn,2])
+    infn2<-max(rown2[rown2 < kurt])
+    if(is.infinite(infn2)){
+      infn2<-min(rown2)
+    }
+    supn2<-min(rown2[rown2 > kurt])
+    if(is.infinite(supn2)){
+      supn2<-max(rown2)
+    }
+    
+    d1<-dlist[dlist[,1]==supn & dlist[,2]==infn2,indextype]
     d2<-dlist[dlist[,1]==supn & dlist[,2]==supn2,indextype]
     
-    
     if(d1==d2){
-      result1<-d1
-    }else if (supn!=infn){
-      result1<-(((d2-d1)*((size-infn)/(supn-infn)))+d1)
+      db<-d1
     }else{
-      result1<-(((d2-d1)*((kurt-infn2)/(supn2-infn2)))+d1)
+      db<-(((d2-d1)*((kurt-infn2)/(supn2-infn2)))+d1)
+    }
+    
+    if(da==db){
+      result1<-da
+    }else{
+      result1<-(((db-da)*((size-infn)/(supn-infn)))+da)
     }
   }
   return(result1)
 }
 
 
-mmmraw<-function(x,interval=8,fast=TRUE,batch="auto"){
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
+mmmraw<-function(x,interval=8,fast=TRUE,batch="auto",sorted=FALSE){
+  if(sorted){
+    sortedx<-x
+  }else{
+    sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
+  }
+  #sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
   SWA1<-SWA(x=sortedx,interval=interval,fast=fast,batch=batch)
   if(SWA1[2]==Inf){
     return(print("BM is infinity, due to the double precision floating point limits. Usually, the solution is transforming your original data."))
@@ -527,18 +554,34 @@ CDF<-function(x,xevaluated,sorted=FALSE){
   }
 }
 
+quantilefunction<-function(x,quatiletarget,sorted=FALSE){
+  if(sorted){
+    sortedx<-x
+  }else{
+    sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
+  }
+  lengthx<-length(x)
+  h1<-(lengthx+1/3)*quatiletarget+1/3
+  h1f<-floor(h1)
+  h1c<-ceiling(h1)
+  sortedquantile1<-sortedx[h1f]
+  sortedquantile2<-sortedx[h1c]
+  result<-sortedquantile1+(h1-h1f)*(sortedquantile2-sortedquantile1)
+  names(result)<-quatiletarget
+  return(result)
+}
 
 mmmprocessrm<-function(x,interval=8,SWA,median,mx1,drm=0.375){
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
-  lengthx<-length(x)
+  #sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
+  #lengthx<-length(x)
   rm1<--drm*median+SWA+drm*SWA
   names(rm1)<-NULL
   output1<-c(rm=rm1)
   return(output1)
 }
 mmmprocessqm<-function(x,interval=8,SWA,median,mx1,dqm=0.567){
-  sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
-  lengthx<-length(x)
+  #sortedx<-Sort(x,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
+  #lengthx<-length(x)
   if (mx1==0.5){
     quatiletarget<-0.5
   }else if (mx1>0.5){
@@ -550,17 +593,17 @@ mmmprocessqm<-function(x,interval=8,SWA,median,mx1,dqm=0.567){
   }
   upper1<-(1-1/interval)
   lower1<-1/interval
-  if (!is.na(quatiletarget) & quatiletarget>(upper1)){
-    print(paste("Warning: the percentile exceeds ",as.character(upper1*interval),"/",as.character(interval),", the robustness shrinks."))
-  }else if(!is.na(quatiletarget) & quatiletarget<(lower1)){
-    print(paste("Warning: the percentile exceeds ",as.character(lower1*interval),"/",as.character(interval),", the robustness shrinks."))
-  }
+  # if (!is.na(quatiletarget) & quatiletarget>(upper1)){
+  #   print(paste("Warning: the percentile exceeds ",as.character(upper1*interval),"/",as.character(interval),", the robustness shrinks."))
+  # }else if(!is.na(quatiletarget) & quatiletarget<(lower1)){
+  #   print(paste("Warning: the percentile exceeds ",as.character(lower1*interval),"/",as.character(interval),", the robustness shrinks."))
+  # }
   if(quatiletarget>upper1){
     quatiletarget=upper1
   }else if(quatiletarget<lower1){
     quatiletarget=lower1
   }
-  qm1<-quantile(sortedx,quatiletarget,type=8)
+  qm1<-quantilefunction(x,quatiletarget,sorted=TRUE)
   output1<-c(qm=qm1)
   return(output1)
 }
@@ -577,14 +620,16 @@ Balltest<-function (x,orderlist1_sorted2=NULL,orderlist1_sorted3=NULL,orderlist1
   }
   
   dp2varx<-apply(bootstrappedsample2,MARGIN=1,FUN=getvar)
+  dp2varx<-Sort(dp2varx,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
   
   getHL<-function(vector){ 
     ((vector[1]+vector[2]))/2
   }
   
   dp2HLx<-apply(bootstrappedsample2,MARGIN=1,FUN=getHL)
+  dp2HLx<-Sort(dp2HLx,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
   
-  HL1<-median(dp2HLx)
+  HL1<-mediansorted(dp2HLx)
   
   bootstrappedsample2<-c()
   
@@ -595,6 +640,7 @@ Balltest<-function (x,orderlist1_sorted2=NULL,orderlist1_sorted3=NULL,orderlist1
   }
   
   dp3tmx<-apply(bootstrappedsample3,MARGIN=1,FUN=gettm)
+  dp3tmx<-Sort(dp3tmx,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
   
   bootstrappedsample3<-c()
   
@@ -611,857 +657,279 @@ Balltest<-function (x,orderlist1_sorted2=NULL,orderlist1_sorted3=NULL,orderlist1
   }
   
   dp4fmx<-apply(bootstrappedsample4,MARGIN=1,FUN=getfm)
+  dp4fmx<-Sort(dp4fmx,descending=FALSE,partial=NULL,stable=FALSE,na.last=NULL)
   
   bootstrappedsample4<-c()
   
-  mmm1raw<-mmmraw(x=sortedx,interval=interval,fast=fast,batch=batch)
+  mmm1raw<-mmmraw(x=sortedx,interval=interval,fast=fast,batch=batch,sorted=TRUE)
   
-  varmoraw<-mmmraw(x=dp2varx,interval=interval,fast=fast,batch=batch)
+  varmoraw<-mmmraw(x=dp2varx,interval=interval,fast=fast,batch=batch,sorted=TRUE)
   
-  tmmoraw<-mmmraw(x=dp3tmx,interval=interval,fast=fast,batch=batch)
+  tmmoraw<-mmmraw(x=dp3tmx,interval=interval,fast=fast,batch=batch,sorted=TRUE)
   
-  fmmoraw<-mmmraw(x=dp4fmx,interval=interval,fast=fast,batch=batch)
+  fmmoraw<-mmmraw(x=dp4fmx,interval=interval,fast=fast,batch=batch,sorted=TRUE)
   
   standist_d=Weibull_d
   
   #exponential
-  startpoint=9
   
-  mean_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_BM_drm")
-  var_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_BM_drm")
-  tm_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_BM_drm")
-  fm_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_BM_drm")
-  
-  mmm1_BM_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[2],median=mmm1raw[9],mx1=mmm1raw[10],drm=mean_BM_drm1)
-  
-  varmo_BM_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[2],median=varmoraw[9],mx1=varmoraw[10],drm=var_BM_drm1)
-  
-  tmmo_BM_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[2],median=tmmoraw[9],mx1=tmmoraw[10],drm=tm_BM_drm1)
-  
-  fmmo_BM_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[2],median=fmmoraw[9],mx1=fmmoraw[10],drm=fm_BM_drm1)
-  
-  
-  rkurt_BM_rm<-((fmmo_BM_rm_exp1))/(varmo_BM_rm_exp1^2)
-  
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_BM_rm && rkurt_BM_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_BM_rm_Weibull1<-mmm1_BM_rm_exp1
-    varmo_BM_rm_Weibull1<-varmo_BM_rm_exp1
-    tmmo_BM_rm_Weibull1<-tmmo_BM_rm_exp1
-    fmmo_BM_rm_Weibull1<-fmmo_BM_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
+  estimators_rm<-function(meantype,vartype,tmtype,fmtype,type11=1){
+    
+    startpoint=9
+    
+    mean_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=meantype)
+    var_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=vartype)
+    tm_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=tmtype)
+    fm_BM_drm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=fmtype)
+    
+    mmm1_BM_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[type11+1],median=mmm1raw[9],mx1=mmm1raw[type11+9],drm=mean_BM_drm1)
+    
+    varmo_BM_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[type11+1],median=varmoraw[9],mx1=varmoraw[type11+9],drm=var_BM_drm1)
+    
+    tmmo_BM_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[type11+1],median=tmmoraw[9],mx1=tmmoraw[type11+9],drm=tm_BM_drm1)
+    
+    fmmo_BM_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],drm=fm_BM_drm1)
+    
+    rkurt_BM_rm<-((fmmo_BM_rm_exp1))/(varmo_BM_rm_exp1^2)
+    
+    #Weibull
+    
+    kurt0<-startpoint
+    
+    kurt1<-rkurt_BM_rm
+    
+    Kappa1<-function(rkurt_BM_rm){
+      var_BM_drm1<-d_adjust(size=lengthx,kurt=rkurt_BM_rm,dlist=standist_d,type=vartype)
       
-      var_BM_drm1<-d_adjust(size=lengthx,kurt=rkurt_BM_rm,dlist=standist_d,type="var_BM_drm")
+      fm_BM_drm1<-d_adjust(size=lengthx,kurt=rkurt_BM_rm,dlist=standist_d,type=fmtype)
       
-      fm_BM_drm1<-d_adjust(size=lengthx,kurt=rkurt_BM_rm,dlist=standist_d,type="fm_BM_drm")
+      varmo_BM_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[type11+1],median=varmoraw[9],mx1=varmoraw[type11+9],drm=var_BM_drm1)
       
-      varmo_BM_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[2],median=varmoraw[9],mx1=varmoraw[10],drm=var_BM_drm1)
+      fmmo_BM_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],drm=fm_BM_drm1)
       
-      fmmo_BM_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[2],median=fmmoraw[9],mx1=fmmoraw[10],drm=fm_BM_drm1)
       
-      newrrkurt_BM_rm<-((fmmo_BM_rm_Weibull1))/(varmo_BM_rm_Weibull1^2)
+      ((fmmo_BM_rm_Weibull1))/(varmo_BM_rm_Weibull1^2)
+    }
+    step1 <- 0
+    checklow<-Kappa1(2.8)-2.8
+    checkup<-Kappa1(26)-26
+    
+    if (((abs(kurt0-kurt1))<criterion)){
       
-      if ((((rkurt_BM_rm*(1-criterion))<newrrkurt_BM_rm && newrrkurt_BM_rm<(rkurt_BM_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_BM_drm1<-d_adjust(size=lengthx,kurt=rkurt_BM_rm,dlist=standist_d,type="mean_BM_drm")
-        
-        tm_BM_drm1<-d_adjust(size=lengthx,kurt=rkurt_BM_rm,dlist=standist_d,type="tm_BM_drm")
-        
-        mmm1_BM_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[2],median=mmm1raw[9],mx1=mmm1raw[10],drm=mean_BM_drm1)
-        
-        tmmo_BM_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[2],median=tmmoraw[9],mx1=tmmoraw[10],drm=tm_BM_drm1)
-        
-        break
+    }else if ((checklow*checkup)>0){
+      if(checklow>0){
+        kurt1<-2.8
+      }else{
+        kurt1<-26
       }
-      rkurt_BM_rm<-newrrkurt_BM_rm
+    }else{
+      
+      repeat {
+        step1 <-step1 + 1
+        
+        kurt2<-Kappa1(kurt1)
+        
+        if ((abs(kurt1-kurt2))<criterion*1e-09 || (step1 == stepsize)){
+          
+          break
+        }
+        kurt1<-kurt2
+      }
       
     }
     
+    mean_BM_drm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=meantype)
+    
+    tm_BM_drm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=tmtype)
+    
+    var_BM_drm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=vartype)
+    
+    fm_BM_drm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=fmtype)
+    
+    varmo_BM_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[type11+1],median=varmoraw[9],mx1=varmoraw[type11+9],drm=var_BM_drm1)
+    
+    fmmo_BM_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],drm=fm_BM_drm1)
+    
+    mmm1_BM_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[type11+1],median=mmm1raw[9],mx1=mmm1raw[type11+9],drm=mean_BM_drm1)
+    
+    tmmo_BM_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[type11+1],median=tmmoraw[9],mx1=tmmoraw[type11+9],drm=tm_BM_drm1)
+    
+    allresults<-c(mmm1_exp1=mmm1_BM_rm_exp1,
+                  varmo_exp1=varmo_BM_rm_exp1,
+                  tmmo_exp1=tmmo_BM_rm_exp1,
+                  fmmo_exp1=fmmo_BM_rm_exp1,
+                  mmm1_Weibull1=mmm1_BM_rm_Weibull1,
+                  varmo_Weibull1=varmo_BM_rm_Weibull1,
+                  tmmo_Weibull1=tmmo_BM_rm_Weibull1,
+                  fmmo_Weibull1=fmmo_BM_rm_Weibull1
+    )
+    return(allresults)
   }
   
-  mean_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_BM_dqm")
-  var_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_BM_dqm")
-  tm_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_BM_dqm")
-  fm_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_BM_dqm")
   
-  mmm1_BM_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[2],median=mmm1raw[9],mx1=mmm1raw[10],dqm=mean_BM_dqm1)
-  
-  varmo_BM_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[2],median=varmoraw[9],mx1=varmoraw[10],dqm=var_BM_dqm1)
-  
-  tmmo_BM_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[2],median=tmmoraw[9],mx1=tmmoraw[10],dqm=tm_BM_dqm1)
-  
-  fmmo_BM_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[2],median=fmmoraw[9],mx1=fmmoraw[10],dqm=fm_BM_dqm1)
-  
-  rkurt_BM_qm<-((fmmo_BM_qm_exp1))/(varmo_BM_qm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_BM_qm && rkurt_BM_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_BM_qm_Weibull1<-mmm1_BM_qm_exp1
-    varmo_BM_qm_Weibull1<-varmo_BM_qm_exp1
-    tmmo_BM_qm_Weibull1<-tmmo_BM_qm_exp1
-    fmmo_BM_qm_Weibull1<-fmmo_BM_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
+  estimators_qm<-function(meantype,vartype,tmtype,fmtype,type11=1){
+    
+    startpoint=9
+    
+    mean_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=meantype)
+    var_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=vartype)
+    tm_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=tmtype)
+    fm_BM_dqm1<-d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type=fmtype)
+    
+    mmm1_BM_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[type11+1],median=mmm1raw[9],mx1=mmm1raw[type11+9],dqm=mean_BM_dqm1)
+    
+    varmo_BM_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[type11+1],median=varmoraw[9],mx1=varmoraw[type11+9],dqm=var_BM_dqm1)
+    
+    tmmo_BM_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[type11+1],median=tmmoraw[9],mx1=tmmoraw[type11+9],dqm=tm_BM_dqm1)
+    
+    fmmo_BM_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],dqm=fm_BM_dqm1)
+    
+    rkurt_BM_qm<-((fmmo_BM_qm_exp1))/(varmo_BM_qm_exp1^2)
+    
+    #Weibull
+    
+    kurt0<-startpoint
+    
+    kurt1<-rkurt_BM_qm
+    
+    Kappa1<-function(rkurt_BM_qm){
+      var_BM_dqm1<-d_adjust(size=lengthx,kurt=rkurt_BM_qm,dlist=standist_d,type=vartype)
       
-      var_BM_dqm1<-d_adjust(size=lengthx,kurt=rkurt_BM_qm,dlist=standist_d,type="var_BM_dqm")
+      fm_BM_dqm1<-d_adjust(size=lengthx,kurt=rkurt_BM_qm,dlist=standist_d,type=fmtype)
       
-      fm_BM_dqm1<-d_adjust(size=lengthx,kurt=rkurt_BM_qm,dlist=standist_d,type="fm_BM_dqm")
+      varmo_BM_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[type11+1],median=varmoraw[9],mx1=varmoraw[type11+9],dqm=var_BM_dqm1)
       
-      varmo_BM_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[2],median=varmoraw[9],mx1=varmoraw[10],dqm=var_BM_dqm1)
+      fmmo_BM_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],dqm=fm_BM_dqm1)
+      ((fmmo_BM_qm_Weibull1))/(varmo_BM_qm_Weibull1^2)
+    }
+    checklow<-Kappa1(2.8)-2.8
+    checkup<-Kappa1(26)-26
+    step1 <- 0
+    if (((abs(kurt0-kurt1))<criterion)){
       
-      fmmo_BM_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[2],median=fmmoraw[9],mx1=fmmoraw[10],dqm=fm_BM_dqm1)
-      
-      newrrkurt_BM_qm<-((fmmo_BM_qm_Weibull1))/(varmo_BM_qm_Weibull1^2)
-      
-      if ((((rkurt_BM_qm*(1-criterion))<newrrkurt_BM_qm && newrrkurt_BM_qm<(rkurt_BM_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_BM_dqm1<-d_adjust(size=lengthx,kurt=rkurt_BM_qm,dlist=standist_d,type="mean_BM_dqm")
-        
-        tm_BM_dqm1<-d_adjust(size=lengthx,kurt=rkurt_BM_qm,dlist=standist_d,type="tm_BM_dqm")
-        
-        mmm1_BM_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[2],median=mmm1raw[9],mx1=mmm1raw[10],dqm=mean_BM_dqm1)
-        
-        tmmo_BM_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[2],median=tmmoraw[9],mx1=tmmoraw[10],dqm=tm_BM_dqm1)
-        
-        break
+    }else if (checklow*checkup>0){
+      if(checklow>0){
+        kurt1<-2.8
+      }else{
+        kurt1<-26
       }
-      rkurt_BM_qm<-newrrkurt_BM_qm
+    }else{
+      repeat {
+        step1 <-step1 + 1
+        
+        kurt2<-Kappa1(kurt1)
+        
+        if ((abs(kurt1-kurt2))<criterion || (step1 == stepsize)){
+          
+          break
+        }
+        kurt1<-kurt2
+      }
       
     }
+    print(step1)
+    mean_BM_dqm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=meantype)
     
+    tm_BM_dqm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=tmtype)
+    
+    var_BM_dqm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=vartype)
+    
+    fm_BM_dqm1<-d_adjust(size=lengthx,kurt=kurt1,dlist=standist_d,type=fmtype)
+    
+    varmo_BM_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[type11+1],median=varmoraw[9],mx1=varmoraw[type11+9],dqm=var_BM_dqm1)
+    
+    fmmo_BM_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[type11+1],median=fmmoraw[9],mx1=fmmoraw[type11+9],dqm=fm_BM_dqm1)
+    
+    mmm1_BM_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[type11+1],median=mmm1raw[9],mx1=mmm1raw[type11+9],dqm=mean_BM_dqm1)
+    
+    tmmo_BM_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[type11+1],median=tmmoraw[9],mx1=tmmoraw[type11+9],dqm=tm_BM_dqm1)
+    
+    
+    allresults<-c(mmm1_exp1=mmm1_BM_qm_exp1,
+                  varmo_exp1=varmo_BM_qm_exp1,
+                  tmmo_exp1=tmmo_BM_qm_exp1,
+                  fmmo_exp1=fmmo_BM_qm_exp1,
+                  mmm1_Weibull1=mmm1_BM_qm_Weibull1,
+                  varmo_Weibull1=varmo_BM_qm_Weibull1,
+                  tmmo_Weibull1=tmmo_BM_qm_Weibull1,
+                  fmmo_Weibull1=fmmo_BM_qm_Weibull1
+    )
+    return(allresults)
   }
   
-  mean_sqm_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_sqm_drm")
-  var_sqm_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_sqm_drm")
-  tm_sqm_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_sqm_drm")
-  fm_sqm_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_sqm_drm")
+  BM_rm1<-estimators_rm(meantype="mean_BM_drm",vartype="var_BM_drm",tmtype="tm_BM_drm",fmtype="fm_BM_drm",type11 = 1)
+ 
+  BM_qm1<-estimators_qm(meantype="mean_BM_dqm",vartype="var_BM_dqm",tmtype="tm_BM_dqm",fmtype="fm_BM_dqm",type11 = 1)
   
+  sqm_rm1<-estimators_rm(meantype="mean_sqm_drm",vartype="var_sqm_drm",tmtype="tm_sqm_drm",fmtype="fm_sqm_drm",type11 = 2)
   
-  mmm1_sqm_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[3],median=mmm1raw[9],mx1=mmm1raw[11],drm=mean_sqm_drm1)
+  sqm_qm1<-estimators_qm(meantype="mean_sqm_dqm",vartype="var_sqm_dqm",tmtype="tm_sqm_dqm",fmtype="fm_sqm_dqm",type11 = 2)
   
-  varmo_sqm_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[3],median=varmoraw[9],mx1=varmoraw[11],drm=var_sqm_drm1)
+  wm_rm1<-estimators_rm(meantype="mean_wm1_drm",vartype="var_wm1_drm",tmtype="tm_wm1_drm",fmtype="fm_wm1_drm",type11 = 3)
   
-  tmmo_sqm_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[3],median=tmmoraw[9],mx1=tmmoraw[11],drm=tm_sqm_drm1)
+  wm_qm1<-estimators_qm(meantype="mean_wm1_dqm",vartype="var_wm1_dqm",tmtype="tm_wm1_dqm",fmtype="fm_wm1_dqm",type11=3)
   
-  fmmo_sqm_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[3],median=fmmoraw[9],mx1=fmmoraw[11],drm=fm_sqm_drm1)
+  wm2_rm1<-estimators_rm(meantype="mean_wm2_drm",vartype="var_wm2_drm",tmtype="tm_wm2_drm",fmtype="fm_wm2_drm",type11 = 4)
   
+  wm2_qm1<-estimators_qm(meantype="mean_wm2_dqm",vartype="var_wm2_dqm",tmtype="tm_wm2_dqm",fmtype="fm_wm2_dqm",type11=4)
   
-  rkurt_sqm_rm<-((fmmo_sqm_rm_exp1))/(varmo_sqm_rm_exp1^2)
+  tm_rm1<-estimators_rm(meantype="mean_tm1_drm",vartype="var_tm1_drm",tmtype="tm_tm1_drm",fmtype="fm_tm1_drm",type11=5)
   
-  #Weibull
+  tm_qm1<-estimators_qm(meantype="mean_tm1_dqm",vartype="var_tm1_dqm",tmtype="tm_tm1_dqm",fmtype="fm_tm1_dqm",type11=5)
   
-  if (((startpoint*(1-criterion))<rkurt_sqm_rm && rkurt_sqm_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_sqm_rm_Weibull1<-mmm1_sqm_rm_exp1
-    varmo_sqm_rm_Weibull1<-varmo_sqm_rm_exp1
-    tmmo_sqm_rm_Weibull1<-tmmo_sqm_rm_exp1
-    fmmo_sqm_rm_Weibull1<-fmmo_sqm_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_sqm_drm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_rm,dlist=standist_d,type="var_sqm_drm")
-      
-      fm_sqm_drm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_rm,dlist=standist_d,type="fm_sqm_drm")
-      
-      varmo_sqm_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[3],median=varmoraw[9],mx1=varmoraw[11],drm=var_sqm_drm1)
-      
-      fmmo_sqm_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[3],median=fmmoraw[9],mx1=fmmoraw[11],drm=fm_sqm_drm1)
-      
-      newrrkurt_sqm_rm<-((fmmo_sqm_rm_Weibull1))/(varmo_sqm_rm_Weibull1^2)
-      
-      if ((((rkurt_sqm_rm*(1-criterion))<newrrkurt_sqm_rm && newrrkurt_sqm_rm<(rkurt_sqm_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_sqm_drm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_rm,dlist=standist_d,type="mean_sqm_drm")
-        
-        tm_sqm_drm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_rm,dlist=standist_d,type="tm_sqm_drm")
-        
-        mmm1_sqm_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[3],median=mmm1raw[9],mx1=mmm1raw[11],drm=mean_sqm_drm1)
-        
-        tmmo_sqm_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[3],median=tmmoraw[9],mx1=tmmoraw[11],drm=tm_sqm_drm1)
-        
-        break
-      }
-      rkurt_sqm_rm<-newrrkurt_sqm_rm
-      
-    }
-    
-  }
+  tm2_rm1<-estimators_rm(meantype="mean_tm2_drm",vartype="var_tm2_drm",tmtype="tm_tm2_drm",fmtype="fm_tm2_drm",type11=6)
   
+  tm2_qm1<-estimators_qm(meantype="mean_tm2_dqm",vartype="var_tm2_dqm",tmtype="tm_tm2_dqm",fmtype="fm_tm2_dqm",type11=6)
   
-  mean_sqm_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_sqm_dqm")
-  var_sqm_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_sqm_dqm")
-  tm_sqm_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_sqm_dqm")
-  fm_sqm_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_sqm_dqm")
+  tm3_rm1<-estimators_rm(meantype="mean_tm3_drm",vartype="var_tm3_drm",tmtype="tm_tm3_drm",fmtype="fm_tm3_drm",type11=7)
   
-  mmm1_sqm_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[3],median=mmm1raw[9],mx1=mmm1raw[11],dqm=mean_sqm_dqm1)
-  
-  varmo_sqm_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[3],median=varmoraw[9],mx1=varmoraw[11],dqm=var_sqm_dqm1)
-  
-  tmmo_sqm_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[3],median=tmmoraw[9],mx1=tmmoraw[11],dqm=tm_sqm_dqm1)
-  
-  fmmo_sqm_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[3],median=fmmoraw[9],mx1=fmmoraw[11],dqm=fm_sqm_dqm1)
-  
-  rkurt_sqm_qm<-((fmmo_sqm_qm_exp1))/(varmo_sqm_qm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_sqm_qm && rkurt_sqm_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_sqm_qm_Weibull1<-mmm1_sqm_qm_exp1
-    varmo_sqm_qm_Weibull1<-varmo_sqm_qm_exp1
-    tmmo_sqm_qm_Weibull1<-tmmo_sqm_qm_exp1
-    fmmo_sqm_qm_Weibull1<-fmmo_sqm_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_sqm_dqm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_qm,dlist=standist_d,type="var_sqm_dqm")
-      
-      fm_sqm_dqm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_qm,dlist=standist_d,type="fm_sqm_dqm")
-      
-      varmo_sqm_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[3],median=varmoraw[9],mx1=varmoraw[11],dqm=var_sqm_dqm1)
-      
-      fmmo_sqm_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[3],median=fmmoraw[9],mx1=fmmoraw[11],dqm=fm_sqm_dqm1)
-      
-      newrrkurt_sqm_qm<-((fmmo_sqm_qm_Weibull1))/(varmo_sqm_qm_Weibull1^2)
-      
-      if ((((rkurt_sqm_qm*(1-criterion))<newrrkurt_sqm_qm && newrrkurt_sqm_qm<(rkurt_sqm_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_sqm_dqm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_qm,dlist=standist_d,type="mean_sqm_dqm")
-        
-        tm_sqm_dqm1<-d_adjust(size=lengthx,kurt=rkurt_sqm_qm,dlist=standist_d,type="tm_sqm_dqm")
-        
-        mmm1_sqm_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[3],median=mmm1raw[9],mx1=mmm1raw[11],dqm=mean_sqm_dqm1)
-        
-        tmmo_sqm_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[3],median=tmmoraw[9],mx1=tmmoraw[11],dqm=tm_sqm_dqm1)
-        
-        break
-      }
-      rkurt_sqm_qm<-newrrkurt_sqm_qm
-      
-    }
-    
-  }
-  
-  mean_wm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_wm1_drm")
-  var_wm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_wm1_drm")
-  tm_wm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_wm1_drm")
-  fm_wm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_wm1_drm")
-  
-  
-  mmm1_wm1_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[4],median=mmm1raw[9],mx1=mmm1raw[12],drm=mean_wm1_drm1)
-  
-  varmo_wm1_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[4],median=varmoraw[9],mx1=varmoraw[12],drm=var_wm1_drm1)
-  
-  tmmo_wm1_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[4],median=tmmoraw[9],mx1=tmmoraw[12],drm=tm_wm1_drm1)
-  
-  fmmo_wm1_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[4],median=fmmoraw[9],mx1=fmmoraw[12],drm=fm_wm1_drm1)
-  
-  
-  rkurt_wm1_rm<-((fmmo_wm1_rm_exp1))/(varmo_wm1_rm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_wm1_rm && rkurt_wm1_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_wm1_rm_Weibull1<-mmm1_wm1_rm_exp1
-    varmo_wm1_rm_Weibull1<-varmo_wm1_rm_exp1
-    tmmo_wm1_rm_Weibull1<-tmmo_wm1_rm_exp1
-    fmmo_wm1_rm_Weibull1<-fmmo_wm1_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_wm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_rm,dlist=standist_d,type="var_wm1_drm")
-      
-      fm_wm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_rm,dlist=standist_d,type="fm_wm1_drm")
-      
-      varmo_wm1_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[4],median=varmoraw[9],mx1=varmoraw[12],drm=var_wm1_drm1)
-      
-      fmmo_wm1_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[4],median=fmmoraw[9],mx1=fmmoraw[12],drm=fm_wm1_drm1)
-      
-      newrrkurt_wm1_rm<-((fmmo_wm1_rm_Weibull1))/(varmo_wm1_rm_Weibull1^2)
-      
-      if ((((rkurt_wm1_rm*(1-criterion))<newrrkurt_wm1_rm && newrrkurt_wm1_rm<(rkurt_wm1_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_wm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_rm,dlist=standist_d,type="mean_wm1_drm")
-        
-        tm_wm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_rm,dlist=standist_d,type="tm_wm1_drm")
-        
-        mmm1_wm1_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[4],median=mmm1raw[9],mx1=mmm1raw[12],drm=mean_wm1_drm1)
-        
-        tmmo_wm1_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[4],median=tmmoraw[9],mx1=tmmoraw[12],drm=tm_wm1_drm1)
-        
-        break
-      }
-      rkurt_wm1_rm<-newrrkurt_wm1_rm
-      
-    }
-    
-  }
-  
-  
-  mean_wm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_wm1_dqm")
-  var_wm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_wm1_dqm")
-  tm_wm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_wm1_dqm")
-  fm_wm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_wm1_dqm")
-  
-  
-  mmm1_wm1_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[4],median=mmm1raw[9],mx1=mmm1raw[12],dqm=mean_wm1_dqm1)
-  
-  varmo_wm1_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[4],median=varmoraw[9],mx1=varmoraw[12],dqm=var_wm1_dqm1)
-  
-  tmmo_wm1_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[4],median=tmmoraw[9],mx1=tmmoraw[12],dqm=tm_wm1_dqm1)
-  
-  fmmo_wm1_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[4],median=fmmoraw[9],mx1=fmmoraw[12],dqm=fm_wm1_dqm1)
-  
-  rkurt_wm1_qm<-((fmmo_wm1_qm_exp1))/(varmo_wm1_qm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_wm1_qm && rkurt_wm1_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_wm1_qm_Weibull1<-mmm1_wm1_qm_exp1
-    varmo_wm1_qm_Weibull1<-varmo_wm1_qm_exp1
-    tmmo_wm1_qm_Weibull1<-tmmo_wm1_qm_exp1
-    fmmo_wm1_qm_Weibull1<-fmmo_wm1_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_wm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_qm,dlist=standist_d,type="var_wm1_dqm")
-      
-      fm_wm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_qm,dlist=standist_d,type="fm_wm1_dqm")
-      
-      varmo_wm1_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[4],median=varmoraw[9],mx1=varmoraw[12],dqm=var_wm1_dqm1)
-      
-      fmmo_wm1_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[4],median=fmmoraw[9],mx1=fmmoraw[12],dqm=fm_wm1_dqm1)
-      
-      newrrkurt_wm1_qm<-((fmmo_wm1_qm_Weibull1))/(varmo_wm1_qm_Weibull1^2)
-      
-      if ((((rkurt_wm1_qm*(1-criterion))<newrrkurt_wm1_qm && newrrkurt_wm1_qm<(rkurt_wm1_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_wm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_qm,dlist=standist_d,type="mean_wm1_dqm")
-        
-        tm_wm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm1_qm,dlist=standist_d,type="tm_wm1_dqm")
-        
-        mmm1_wm1_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[4],median=mmm1raw[9],mx1=mmm1raw[12],dqm=mean_wm1_dqm1)
-        
-        tmmo_wm1_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[4],median=tmmoraw[9],mx1=tmmoraw[12],dqm=tm_wm1_dqm1)
-        
-        break
-      }
-      rkurt_wm1_qm<-newrrkurt_wm1_qm
-      
-    }
-    
-  }
-  
-  
-  mean_wm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_wm2_drm")
-  var_wm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_wm2_drm")
-  tm_wm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_wm2_drm")
-  fm_wm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_wm2_drm")
-  
-  mmm1_wm2_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[5],median=mmm1raw[9],mx1=mmm1raw[13],drm=mean_wm2_drm1)
-  
-  varmo_wm2_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[5],median=varmoraw[9],mx1=varmoraw[13],drm=var_wm2_drm1)
-  
-  tmmo_wm2_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[5],median=tmmoraw[9],mx1=tmmoraw[13],drm=tm_wm2_drm1)
-  
-  fmmo_wm2_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[5],median=fmmoraw[9],mx1=fmmoraw[13],drm=fm_wm2_drm1)
-  
-  
-  rkurt_wm2_rm<-((fmmo_wm2_rm_exp1))/(varmo_wm2_rm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_wm2_rm && rkurt_wm2_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_wm2_rm_Weibull1<-mmm1_wm2_rm_exp1
-    varmo_wm2_rm_Weibull1<-varmo_wm2_rm_exp1
-    tmmo_wm2_rm_Weibull1<-tmmo_wm2_rm_exp1
-    fmmo_wm2_rm_Weibull1<-fmmo_wm2_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_wm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_rm,dlist=standist_d,type="var_wm2_drm")
-      
-      fm_wm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_rm,dlist=standist_d,type="fm_wm2_drm")
-      
-      varmo_wm2_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[5],median=varmoraw[9],mx1=varmoraw[13],drm=var_wm2_drm1)
-      
-      fmmo_wm2_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[5],median=fmmoraw[9],mx1=fmmoraw[13],drm=fm_wm2_drm1)
-      
-      newrrkurt_wm2_rm<-((fmmo_wm2_rm_Weibull1))/(varmo_wm2_rm_Weibull1^2)
-      
-      if ((((rkurt_wm2_rm*(1-criterion))<newrrkurt_wm2_rm && newrrkurt_wm2_rm<(rkurt_wm2_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_wm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_rm,dlist=standist_d,type="mean_wm2_drm")
-        
-        tm_wm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_rm,dlist=standist_d,type="tm_wm2_drm")
-        
-        mmm1_wm2_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[5],median=mmm1raw[9],mx1=mmm1raw[13],drm=mean_wm2_drm1)
-        
-        tmmo_wm2_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[5],median=tmmoraw[9],mx1=tmmoraw[13],drm=tm_wm2_drm1)
-        
-        break
-      }
-      rkurt_wm2_rm<-newrrkurt_wm2_rm
-      
-    }
-    
-  }
-  
-  
-  mean_wm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_wm2_dqm")
-  var_wm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_wm2_dqm")
-  tm_wm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_wm2_dqm")
-  fm_wm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_wm2_dqm")
-  
-  
-  mmm1_wm2_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[5],median=mmm1raw[9],mx1=mmm1raw[13],dqm=mean_wm2_dqm1)
-  
-  varmo_wm2_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[5],median=varmoraw[9],mx1=varmoraw[13],dqm=var_wm2_dqm1)
-  
-  tmmo_wm2_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[5],median=tmmoraw[9],mx1=tmmoraw[13],dqm=tm_wm2_dqm1)
-  
-  fmmo_wm2_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[5],median=fmmoraw[9],mx1=fmmoraw[13],dqm=fm_wm2_dqm1)
-  
-  rkurt_wm2_qm<-((fmmo_wm2_qm_exp1))/(varmo_wm2_qm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_wm2_qm && rkurt_wm2_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_wm2_qm_Weibull1<-mmm1_wm2_qm_exp1
-    varmo_wm2_qm_Weibull1<-varmo_wm2_qm_exp1
-    tmmo_wm2_qm_Weibull1<-tmmo_wm2_qm_exp1
-    fmmo_wm2_qm_Weibull1<-fmmo_wm2_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_wm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_qm,dlist=standist_d,type="var_wm2_dqm")
-      
-      fm_wm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_qm,dlist=standist_d,type="fm_wm2_dqm")
-      
-      varmo_wm2_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[5],median=varmoraw[9],mx1=varmoraw[13],dqm=var_wm2_dqm1)
-      
-      fmmo_wm2_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[5],median=fmmoraw[9],mx1=fmmoraw[13],dqm=fm_wm2_dqm1)
-      
-      newrrkurt_wm2_qm<-((fmmo_wm2_qm_Weibull1))/(varmo_wm2_qm_Weibull1^2)
-      
-      if ((((rkurt_wm2_qm*(1-criterion))<newrrkurt_wm2_qm && newrrkurt_wm2_qm<(rkurt_wm2_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_wm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_qm,dlist=standist_d,type="mean_wm2_dqm")
-        
-        tm_wm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_wm2_qm,dlist=standist_d,type="tm_wm2_dqm")
-        
-        mmm1_wm2_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[5],median=mmm1raw[9],mx1=mmm1raw[13],dqm=mean_wm2_dqm1)
-        
-        tmmo_wm2_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[5],median=tmmoraw[9],mx1=tmmoraw[13],dqm=tm_wm2_dqm1)
-        
-        break
-      }
-      rkurt_wm2_qm<-newrrkurt_wm2_qm
-      
-    }
-    
-  }
-  
-  mean_tm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_tm1_drm")
-  var_tm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_tm1_drm")
-  tm_tm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_tm1_drm")
-  fm_tm1_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_tm1_drm")
-  
-  mmm1_tm1_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[6],median=mmm1raw[9],mx1=mmm1raw[14],drm=mean_tm1_drm1)
-  
-  varmo_tm1_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[6],median=varmoraw[9],mx1=varmoraw[14],drm=var_tm1_drm1)
-  
-  tmmo_tm1_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[6],median=tmmoraw[9],mx1=tmmoraw[14],drm=tm_tm1_drm1)
-  
-  fmmo_tm1_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[6],median=fmmoraw[9],mx1=fmmoraw[14],drm=fm_tm1_drm1)
-  
-  
-  rkurt_tm1_rm<-((fmmo_tm1_rm_exp1))/(varmo_tm1_rm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_tm1_rm && rkurt_tm1_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_tm1_rm_Weibull1<-mmm1_tm1_rm_exp1
-    varmo_tm1_rm_Weibull1<-varmo_tm1_rm_exp1
-    tmmo_tm1_rm_Weibull1<-tmmo_tm1_rm_exp1
-    fmmo_tm1_rm_Weibull1<-fmmo_tm1_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_tm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_rm,dlist=standist_d,type="var_tm1_drm")
-      
-      fm_tm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_rm,dlist=standist_d,type="fm_tm1_drm")
-      
-      varmo_tm1_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[6],median=varmoraw[9],mx1=varmoraw[14],drm=var_tm1_drm1)
-      
-      fmmo_tm1_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[6],median=fmmoraw[9],mx1=fmmoraw[14],drm=fm_tm1_drm1)
-      
-      newrrkurt_tm1_rm<-((fmmo_tm1_rm_Weibull1))/(varmo_tm1_rm_Weibull1^2)
-      
-      if ((((rkurt_tm1_rm*(1-criterion))<newrrkurt_tm1_rm && newrrkurt_tm1_rm<(rkurt_tm1_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_tm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_rm,dlist=standist_d,type="mean_tm1_drm")
-        
-        tm_tm1_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_rm,dlist=standist_d,type="tm_tm1_drm")
-        
-        mmm1_tm1_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[6],median=mmm1raw[9],mx1=mmm1raw[14],drm=mean_tm1_drm1)
-        
-        tmmo_tm1_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[6],median=tmmoraw[9],mx1=tmmoraw[14],drm=tm_tm1_drm1)
-        
-        break
-      }
-      rkurt_tm1_rm<-newrrkurt_tm1_rm
-      
-    }
-    
-  }
-  
-  
-  mean_tm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_tm1_dqm")
-  var_tm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_tm1_dqm")
-  tm_tm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_tm1_dqm")
-  fm_tm1_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_tm1_dqm")
-  
-  mmm1_tm1_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[6],median=mmm1raw[9],mx1=mmm1raw[14],dqm=mean_tm1_dqm1)
-  
-  varmo_tm1_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[6],median=varmoraw[9],mx1=varmoraw[14],dqm=var_tm1_dqm1)
-  
-  tmmo_tm1_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[6],median=tmmoraw[9],mx1=tmmoraw[14],dqm=tm_tm1_dqm1)
-  
-  fmmo_tm1_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[6],median=fmmoraw[9],mx1=fmmoraw[14],dqm=fm_tm1_dqm1)
-  
-  rkurt_tm1_qm<-((fmmo_tm1_qm_exp1))/(varmo_tm1_qm_exp1^2)
-  
-  #Weibull
-  
-  
-  if (((startpoint*(1-criterion))<rkurt_tm1_qm && rkurt_tm1_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_tm1_qm_Weibull1<-mmm1_tm1_qm_exp1
-    varmo_tm1_qm_Weibull1<-varmo_tm1_qm_exp1
-    tmmo_tm1_qm_Weibull1<-tmmo_tm1_qm_exp1
-    fmmo_tm1_qm_Weibull1<-fmmo_tm1_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_tm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_qm,dlist=standist_d,type="var_tm1_dqm")
-      
-      fm_tm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_qm,dlist=standist_d,type="fm_tm1_dqm")
-      
-      varmo_tm1_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[6],median=varmoraw[9],mx1=varmoraw[14],dqm=var_tm1_dqm1)
-      
-      fmmo_tm1_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[6],median=fmmoraw[9],mx1=fmmoraw[14],dqm=fm_tm1_dqm1)
-      
-      newrrkurt_tm1_qm<-((fmmo_tm1_qm_Weibull1))/(varmo_tm1_qm_Weibull1^2)
-      
-      if ((((rkurt_tm1_qm*(1-criterion))<newrrkurt_tm1_qm && newrrkurt_tm1_qm<(rkurt_tm1_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_tm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_qm,dlist=standist_d,type="mean_tm1_dqm")
-        
-        tm_tm1_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm1_qm,dlist=standist_d,type="tm_tm1_dqm")
-        
-        mmm1_tm1_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[6],median=mmm1raw[9],mx1=mmm1raw[14],dqm=mean_tm1_dqm1)
-        
-        tmmo_tm1_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[6],median=tmmoraw[9],mx1=tmmoraw[14],dqm=tm_tm1_dqm1)
-        
-        break
-      }
-      rkurt_tm1_qm<-newrrkurt_tm1_qm
-      
-    }
-    
-  }
-  
-  mean_tm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_tm2_drm")
-  var_tm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_tm2_drm")
-  tm_tm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_tm2_drm")
-  fm_tm2_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_tm2_drm")
-  
-  
-  mmm1_tm2_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[7],median=mmm1raw[9],mx1=mmm1raw[15],drm=mean_tm2_drm1)
-  
-  varmo_tm2_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[7],median=varmoraw[9],mx1=varmoraw[15],drm=var_tm2_drm1)
-  
-  tmmo_tm2_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[7],median=tmmoraw[9],mx1=tmmoraw[15],drm=tm_tm2_drm1)
-  
-  fmmo_tm2_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[7],median=fmmoraw[9],mx1=fmmoraw[15],drm=fm_tm2_drm1)
-  
-  
-  rkurt_tm2_rm<-((fmmo_tm2_rm_exp1))/(varmo_tm2_rm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_tm2_rm && rkurt_tm2_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_tm2_rm_Weibull1<-mmm1_tm2_rm_exp1
-    varmo_tm2_rm_Weibull1<-varmo_tm2_rm_exp1
-    tmmo_tm2_rm_Weibull1<-tmmo_tm2_rm_exp1
-    fmmo_tm2_rm_Weibull1<-fmmo_tm2_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_tm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_rm,dlist=standist_d,type="var_tm2_drm")
-      
-      fm_tm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_rm,dlist=standist_d,type="fm_tm2_drm")
-      
-      varmo_tm2_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[7],median=varmoraw[9],mx1=varmoraw[15],drm=var_tm2_drm1)
-      
-      fmmo_tm2_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[7],median=fmmoraw[9],mx1=fmmoraw[15],drm=fm_tm2_drm1)
-      
-      newrrkurt_tm2_rm<-((fmmo_tm2_rm_Weibull1))/(varmo_tm2_rm_Weibull1^2)
-      
-      if ((((rkurt_tm2_rm*(1-criterion))<newrrkurt_tm2_rm && newrrkurt_tm2_rm<(rkurt_tm2_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_tm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_rm,dlist=standist_d,type="mean_tm2_drm")
-        
-        tm_tm2_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_rm,dlist=standist_d,type="tm_tm2_drm")
-        
-        mmm1_tm2_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[7],median=mmm1raw[9],mx1=mmm1raw[15],drm=mean_tm2_drm1)
-        
-        tmmo_tm2_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[7],median=tmmoraw[9],mx1=tmmoraw[15],drm=tm_tm2_drm1)
-        
-        break
-      }
-      rkurt_tm2_rm<-newrrkurt_tm2_rm
-      
-    }
-    
-  }
-  
-  
-  mean_tm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_tm2_dqm")
-  var_tm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_tm2_dqm")
-  tm_tm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_tm2_dqm")
-  fm_tm2_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_tm2_dqm")
-  
-  
-  mmm1_tm2_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[7],median=mmm1raw[9],mx1=mmm1raw[15],dqm=mean_tm2_dqm1)
-  
-  varmo_tm2_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[7],median=varmoraw[9],mx1=varmoraw[15],dqm=var_tm2_dqm1)
-  
-  tmmo_tm2_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[7],median=tmmoraw[9],mx1=tmmoraw[15],dqm=tm_tm2_dqm1)
-  
-  fmmo_tm2_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[7],median=fmmoraw[9],mx1=fmmoraw[15],dqm=fm_tm2_dqm1)
-  
-  rkurt_tm2_qm<-((fmmo_tm2_qm_exp1))/(varmo_tm2_qm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_tm2_qm && rkurt_tm2_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_tm2_qm_Weibull1<-mmm1_tm2_qm_exp1
-    varmo_tm2_qm_Weibull1<-varmo_tm2_qm_exp1
-    tmmo_tm2_qm_Weibull1<-tmmo_tm2_qm_exp1
-    fmmo_tm2_qm_Weibull1<-fmmo_tm2_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_tm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_qm,dlist=standist_d,type="var_tm2_dqm")
-      
-      fm_tm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_qm,dlist=standist_d,type="fm_tm2_dqm")
-      
-      varmo_tm2_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[7],median=varmoraw[9],mx1=varmoraw[15],dqm=var_tm2_dqm1)
-      
-      fmmo_tm2_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[7],median=fmmoraw[9],mx1=fmmoraw[15],dqm=fm_tm2_dqm1)
-      
-      newrrkurt_tm2_qm<-((fmmo_tm2_qm_Weibull1))/(varmo_tm2_qm_Weibull1^2)
-      
-      if ((((rkurt_tm2_qm*(1-criterion))<newrrkurt_tm2_qm && newrrkurt_tm2_qm<(rkurt_tm2_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_tm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_qm,dlist=standist_d,type="mean_tm2_dqm")
-        
-        tm_tm2_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm2_qm,dlist=standist_d,type="tm_tm2_dqm")
-        
-        mmm1_tm2_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[7],median=mmm1raw[9],mx1=mmm1raw[15],dqm=mean_tm2_dqm1)
-        
-        tmmo_tm2_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[7],median=tmmoraw[9],mx1=tmmoraw[15],dqm=tm_tm2_dqm1)
-        
-        break
-      }
-      rkurt_tm2_qm<-newrrkurt_tm2_qm
-      
-    }
-    
-  }
-  
-  mean_tm3_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_tm3_drm")
-  var_tm3_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_tm3_drm")
-  tm_tm3_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_tm3_drm")
-  fm_tm3_drm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_tm3_drm")
-  
-  mmm1_tm3_rm_exp1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[8],median=mmm1raw[9],mx1=mmm1raw[16],drm=mean_tm3_drm1)
-  
-  varmo_tm3_rm_exp1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[8],median=varmoraw[9],mx1=varmoraw[16],drm=var_tm3_drm1)
-  
-  tmmo_tm3_rm_exp1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[8],median=tmmoraw[9],mx1=tmmoraw[16],drm=tm_tm3_drm1)
-  
-  fmmo_tm3_rm_exp1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[8],median=fmmoraw[9],mx1=fmmoraw[16],drm=fm_tm3_drm1)
-  
-  
-  rkurt_tm3_rm<-((fmmo_tm3_rm_exp1))/(varmo_tm3_rm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_tm3_rm && rkurt_tm3_rm<(startpoint*(1)/(1-criterion)))){
-    mmm1_tm3_rm_Weibull1<-mmm1_tm3_rm_exp1
-    varmo_tm3_rm_Weibull1<-varmo_tm3_rm_exp1
-    tmmo_tm3_rm_Weibull1<-tmmo_tm3_rm_exp1
-    fmmo_tm3_rm_Weibull1<-fmmo_tm3_rm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_tm3_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_rm,dlist=standist_d,type="var_tm3_drm")
-      
-      fm_tm3_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_rm,dlist=standist_d,type="fm_tm3_drm")
-      
-      varmo_tm3_rm_Weibull1<-mmmprocessrm(x=dp2varx,interval=interval,SWA=varmoraw[8],median=varmoraw[9],mx1=varmoraw[16],drm=var_tm3_drm1)
-      
-      fmmo_tm3_rm_Weibull1<-mmmprocessrm(x=dp4fmx,interval=interval,SWA=fmmoraw[8],median=fmmoraw[9],mx1=fmmoraw[16],drm=fm_tm3_drm1)
-      
-      newrrkurt_tm3_rm<-((fmmo_tm3_rm_Weibull1))/(varmo_tm3_rm_Weibull1^2)
-      
-      if ((((rkurt_tm3_rm*(1-criterion))<newrrkurt_tm3_rm && newrrkurt_tm3_rm<(rkurt_tm3_rm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_tm3_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_rm,dlist=standist_d,type="mean_tm3_drm")
-        
-        tm_tm3_drm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_rm,dlist=standist_d,type="tm_tm3_drm")
-        
-        mmm1_tm3_rm_Weibull1<-mmmprocessrm(x=sortedx,interval=interval,SWA=mmm1raw[8],median=mmm1raw[9],mx1=mmm1raw[16],drm=mean_tm3_drm1)
-        
-        tmmo_tm3_rm_Weibull1<-mmmprocessrm(x=dp3tmx,interval=interval,SWA=tmmoraw[8],median=tmmoraw[9],mx1=tmmoraw[16],drm=tm_tm3_drm1)
-        
-        break
-      }
-      rkurt_tm3_rm<-newrrkurt_tm3_rm
-      
-    }
-    
-  }
-  
-  
-  mean_tm3_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="mean_tm3_dqm")
-  var_tm3_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="var_tm3_dqm")
-  tm_tm3_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="tm_tm3_dqm")
-  fm_tm3_dqm1=d_adjust(size=lengthx,kurt=startpoint,dlist=standist_d,type="fm_tm3_dqm")
-  
-  mmm1_tm3_qm_exp1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[8],median=mmm1raw[9],mx1=mmm1raw[16],dqm=mean_tm3_dqm1)
-  
-  varmo_tm3_qm_exp1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[8],median=varmoraw[9],mx1=varmoraw[16],dqm=var_tm3_dqm1)
-  
-  tmmo_tm3_qm_exp1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[8],median=tmmoraw[9],mx1=tmmoraw[16],dqm=tm_tm3_dqm1)
-  
-  fmmo_tm3_qm_exp1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[8],median=fmmoraw[9],mx1=fmmoraw[16],dqm=fm_tm3_dqm1)
-  
-  rkurt_tm3_qm<-((fmmo_tm3_qm_exp1))/(varmo_tm3_qm_exp1^2)
-  
-  #Weibull
-  
-  if (((startpoint*(1-criterion))<rkurt_tm3_qm && rkurt_tm3_qm<(startpoint*(1)/(1-criterion)))){
-    mmm1_tm3_qm_Weibull1<-mmm1_tm3_qm_exp1
-    varmo_tm3_qm_Weibull1<-varmo_tm3_qm_exp1
-    tmmo_tm3_qm_Weibull1<-tmmo_tm3_qm_exp1
-    fmmo_tm3_qm_Weibull1<-fmmo_tm3_qm_exp1
-  }else{
-    step1 <- 1
-    repeat {
-      step1 <-step1 + 1
-      
-      var_tm3_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_qm,dlist=standist_d,type="var_tm3_dqm")
-      
-      fm_tm3_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_qm,dlist=standist_d,type="fm_tm3_dqm")
-      
-      varmo_tm3_qm_Weibull1<-mmmprocessqm(x=dp2varx,interval=interval,SWA=varmoraw[8],median=varmoraw[9],mx1=varmoraw[16],dqm=var_tm3_dqm1)
-      
-      fmmo_tm3_qm_Weibull1<-mmmprocessqm(x=dp4fmx,interval=interval,SWA=fmmoraw[8],median=fmmoraw[9],mx1=fmmoraw[16],dqm=fm_tm3_dqm1)
-      
-      newrrkurt_tm3_qm<-((fmmo_tm3_qm_Weibull1))/(varmo_tm3_qm_Weibull1^2)
-      
-      if ((((rkurt_tm3_qm*(1-criterion))<newrrkurt_tm3_qm && newrrkurt_tm3_qm<(rkurt_tm3_qm*(1)/(1-criterion)))) || (step1 == stepsize)){
-        
-        mean_tm3_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_qm,dlist=standist_d,type="mean_tm3_dqm")
-        
-        tm_tm3_dqm1<-d_adjust(size=lengthx,kurt=rkurt_tm3_qm,dlist=standist_d,type="tm_tm3_dqm")
-        
-        mmm1_tm3_qm_Weibull1<-mmmprocessqm(x=sortedx,interval=interval,SWA=mmm1raw[8],median=mmm1raw[9],mx1=mmm1raw[16],dqm=mean_tm3_dqm1)
-        
-        tmmo_tm3_qm_Weibull1<-mmmprocessqm(x=dp3tmx,interval=interval,SWA=tmmoraw[8],median=tmmoraw[9],mx1=tmmoraw[16],dqm=tm_tm3_dqm1)
-        
-        break
-      }
-      rkurt_tm3_qm<-newrrkurt_tm3_qm
-      
-    }
-    
-  }
-  
+  tm3_qm1<-estimators_qm(meantype="mean_tm3_dqm",vartype="var_tm3_dqm",tmtype="tm_tm3_dqm",fmtype="fm_tm3_dqm",type11=7)
   
   sdall<-c(sdvar=sd(dp2varx),sdtm=sd(dp3tmx),sdfm=sd(dp4fmx))
   
   
-  finallall<-c(HL1=HL1,mmm1raw=mmm1raw,mmm1_BM_rm_exp1=mmm1_BM_rm_exp1,mmm1_BM_rm_Weibull1=mmm1_BM_rm_Weibull1,mmm1_BM_qm_exp1=mmm1_BM_qm_exp1,mmm1_BM_qm_Weibull1=mmm1_BM_qm_Weibull1,
-               mmm1_sqm_rm_exp1=mmm1_sqm_rm_exp1,mmm1_sqm_rm_Weibull1=mmm1_sqm_rm_Weibull1,mmm1_sqm_qm_exp1=mmm1_sqm_qm_exp1,mmm1_sqm_qm_Weibull1=mmm1_sqm_qm_Weibull1,
-               mmm1_wm1_rm_exp1=mmm1_wm1_rm_exp1,mmm1_wm1_rm_Weibull1=mmm1_wm1_rm_Weibull1,mmm1_wm1_qm_exp1=mmm1_wm1_qm_exp1,mmm1_wm1_qm_Weibull1=mmm1_wm1_qm_Weibull1,
-               mmm1_wm2_rm_exp1=mmm1_wm2_rm_exp1,mmm1_wm2_rm_Weibull1=mmm1_wm2_rm_Weibull1,mmm1_wm2_qm_exp1=mmm1_wm2_qm_exp1,mmm1_wm2_qm_Weibull1=mmm1_wm2_qm_Weibull1,
-               mmm1_tm1_rm_exp1=mmm1_tm1_rm_exp1,mmm1_tm1_rm_Weibull1=mmm1_tm1_rm_Weibull1,mmm1_tm1_qm_exp1=mmm1_tm1_qm_exp1,mmm1_tm1_qm_Weibull1=mmm1_tm1_qm_Weibull1,
-               mmm1_tm2_rm_exp1=mmm1_tm2_rm_exp1,mmm1_tm2_rm_Weibull1=mmm1_tm2_rm_Weibull1,mmm1_tm2_qm_exp1=mmm1_tm2_qm_exp1,mmm1_tm2_qm_Weibull1=mmm1_tm2_qm_Weibull1,
-               mmm1_tm3_rm_exp1=mmm1_tm3_rm_exp1,mmm1_tm3_rm_Weibull1=mmm1_tm3_rm_Weibull1,mmm1_tm3_qm_exp1=mmm1_tm3_qm_exp1,mmm1_tm3_qm_Weibull1=mmm1_tm3_qm_Weibull1,
+  allresults<-do.call("rbind", list(BM_rm1,BM_qm1,sqm_rm1,sqm_qm1,wm_rm1,wm_qm1,wm2_rm1,wm2_qm1,tm_rm1,tm_qm1,tm2_rm1,tm2_qm1,tm3_rm1,tm3_qm1))
+  
+  
+  finallall<-c(HL1=HL1,mmm1raw=mmm1raw,mmm1_BM_rm_exp1=allresults[1,1],mmm1_BM_rm_Weibull1=allresults[1,5],mmm1_BM_qm_exp1=allresults[2,1],mmm1_BM_qm_Weibull1=allresults[2,5],
+               mmm1_sqm_rm_exp1=allresults[3,1],mmm1_sqm_rm_Weibull1=allresults[3,5],mmm1_sqm_qm_exp1=allresults[4,1],mmm1_sqm_qm_Weibull1=allresults[4,5],
+               mmm1_wm1_rm_exp1=allresults[5,1],mmm1_wm1_rm_Weibull1=allresults[5,5],mmm1_wm1_qm_exp1=allresults[6,1],mmm1_wm1_qm_Weibull1=allresults[6,5],
+               mmm1_wm2_rm_exp1=allresults[7,1],mmm1_wm2_rm_Weibull1=allresults[7,5],mmm1_wm2_qm_exp1=allresults[8,1],mmm1_wm2_qm_Weibull1=allresults[8,5],
+               mmm1_tm1_rm_exp1=allresults[9,1],mmm1_tm1_rm_Weibull1=allresults[9,5],mmm1_tm1_qm_exp1=allresults[10,1],mmm1_tm1_qm_Weibull1=allresults[10,5],
+               mmm1_tm2_rm_exp1=allresults[11,1],mmm1_tm2_rm_Weibull1=allresults[11,5],mmm1_tm2_qm_exp1=allresults[12,1],mmm1_tm2_qm_Weibull1=allresults[12,5],
+               mmm1_tm3_rm_exp1=allresults[13,1],mmm1_tm3_rm_Weibull1=allresults[13,5],mmm1_tm3_qm_exp1=allresults[14,1],mmm1_tm3_qm_Weibull1=allresults[14,5],
                
-               varmoraw=varmoraw,varmo_BM_rm_exp1=varmo_BM_rm_exp1,varmo_BM_rm_Weibull1=varmo_BM_rm_Weibull1,varmo_BM_qm_exp1=varmo_BM_qm_exp1,varmo_BM_qm_Weibull1=varmo_BM_qm_Weibull1,
-               varmo_sqm_rm_exp1=varmo_sqm_rm_exp1,varmo_sqm_rm_Weibull1=varmo_sqm_rm_Weibull1,varmo_sqm_qm_exp1=varmo_sqm_qm_exp1,varmo_sqm_qm_Weibull1=varmo_sqm_qm_Weibull1,
-               varmo_wm1_rm_exp1=varmo_wm1_rm_exp1,varmo_wm1_rm_Weibull1=varmo_wm1_rm_Weibull1,varmo_wm1_qm_exp1=varmo_wm1_qm_exp1,varmo_wm1_qm_Weibull1=varmo_wm1_qm_Weibull1,
-               varmo_wm2_rm_exp1=varmo_wm2_rm_exp1,varmo_wm2_rm_Weibull1=varmo_wm2_rm_Weibull1,varmo_wm2_qm_exp1=varmo_wm2_qm_exp1,varmo_wm2_qm_Weibull1=varmo_wm2_qm_Weibull1,
-               varmo_tm1_rm_exp1=varmo_tm1_rm_exp1,varmo_tm1_rm_Weibull1=varmo_tm1_rm_Weibull1,varmo_tm1_qm_exp1=varmo_tm1_qm_exp1,varmo_tm1_qm_Weibull1=varmo_tm1_qm_Weibull1,
-               varmo_tm2_rm_exp1=varmo_tm2_rm_exp1,varmo_tm2_rm_Weibull1=varmo_tm2_rm_Weibull1,varmo_tm2_qm_exp1=varmo_tm2_qm_exp1,varmo_tm2_qm_Weibull1=varmo_tm2_qm_Weibull1,
-               varmo_tm3_rm_exp1=varmo_tm3_rm_exp1,varmo_tm3_rm_Weibull1=varmo_tm3_rm_Weibull1,varmo_tm3_qm_exp1=varmo_tm3_qm_exp1,varmo_tm3_qm_Weibull1=varmo_tm3_qm_Weibull1,
+               varmoraw=varmoraw,varmo_BM_rm_exp1=allresults[1,2],varmo_BM_rm_Weibull1=allresults[1,6],varmo_BM_qm_exp1=allresults[2,2],varmo_BM_qm_Weibull1=allresults[2,6],
+               varmo_sqm_rm_exp1=allresults[3,2],varmo_sqm_rm_Weibull1=allresults[3,6],varmo_sqm_qm_exp1=allresults[4,2],varmo_sqm_qm_Weibull1=allresults[4,6],
+               varmo_wm1_rm_exp1=allresults[5,2],varmo_wm1_rm_Weibull1=allresults[5,6],varmo_wm1_qm_exp1=allresults[6,2],varmo_wm1_qm_Weibull1=allresults[6,6],
+               varmo_wm2_rm_exp1=allresults[7,2],varmo_wm2_rm_Weibull1=allresults[7,6],varmo_wm2_qm_exp1=allresults[8,2],varmo_wm2_qm_Weibull1=allresults[8,6],
+               varmo_tm1_rm_exp1=allresults[9,2],varmo_tm1_rm_Weibull1=allresults[9,6],varmo_tm1_qm_exp1=allresults[10,2],varmo_tm1_qm_Weibull1=allresults[10,6],
+               varmo_tm2_rm_exp1=allresults[11,2],varmo_tm2_rm_Weibull1=allresults[11,6],varmo_tm2_qm_exp1=allresults[12,2],varmo_tm2_qm_Weibull1=allresults[12,6],
+               varmo_tm3_rm_exp1=allresults[13,2],varmo_tm3_rm_Weibull1=allresults[13,6],varmo_tm3_qm_exp1=allresults[14,2],varmo_tm3_qm_Weibull1=allresults[14,6],
                
-               tmmoraw=tmmoraw,tmmo_BM_rm_exp1=tmmo_BM_rm_exp1,tmmo_BM_rm_Weibull1=tmmo_BM_rm_Weibull1,tmmo_BM_qm_exp1=tmmo_BM_qm_exp1,tmmo_BM_qm_Weibull1=tmmo_BM_qm_Weibull1,
-               tmmo_sqm_rm_exp1=tmmo_sqm_rm_exp1,tmmo_sqm_rm_Weibull1=tmmo_sqm_rm_Weibull1,tmmo_sqm_qm_exp1=tmmo_sqm_qm_exp1,tmmo_sqm_qm_Weibull1=tmmo_sqm_qm_Weibull1,
-               tmmo_wm1_rm_exp1=tmmo_wm1_rm_exp1,tmmo_wm1_rm_Weibull1=tmmo_wm1_rm_Weibull1,tmmo_wm1_qm_exp1=tmmo_wm1_qm_exp1,tmmo_wm1_qm_Weibull1=tmmo_wm1_qm_Weibull1,
-               tmmo_wm2_rm_exp1=tmmo_wm2_rm_exp1,tmmo_wm2_rm_Weibull1=tmmo_wm2_rm_Weibull1,tmmo_wm2_qm_exp1=tmmo_wm2_qm_exp1,tmmo_wm2_qm_Weibull1=tmmo_wm2_qm_Weibull1,
-               tmmo_tm1_rm_exp1=tmmo_tm1_rm_exp1,tmmo_tm1_rm_Weibull1=tmmo_tm1_rm_Weibull1,tmmo_tm1_qm_exp1=tmmo_tm1_qm_exp1,tmmo_tm1_qm_Weibull1=tmmo_tm1_qm_Weibull1,
-               tmmo_tm2_rm_exp1=tmmo_tm2_rm_exp1,tmmo_tm2_rm_Weibull1=tmmo_tm2_rm_Weibull1,tmmo_tm2_qm_exp1=tmmo_tm2_qm_exp1,tmmo_tm2_qm_Weibull1=tmmo_tm2_qm_Weibull1,
-               tmmo_tm3_rm_exp1=tmmo_tm3_rm_exp1,tmmo_tm3_rm_Weibull1=tmmo_tm3_rm_Weibull1,tmmo_tm3_qm_exp1=tmmo_tm3_qm_exp1,tmmo_tm3_qm_Weibull1=tmmo_tm3_qm_Weibull1,
+               tmmoraw=tmmoraw,tmmo_BM_rm_exp1=allresults[1,3],tmmo_BM_rm_Weibull1=allresults[1,7],tmmo_BM_qm_exp1=allresults[2,3],tmmo_BM_qm_Weibull1=allresults[2,7],
+               tmmo_sqm_rm_exp1=allresults[3,3],tmmo_sqm_rm_Weibull1=allresults[3,7],tmmo_sqm_qm_exp1=allresults[4,3],tmmo_sqm_qm_Weibull1=allresults[4,7],
+               tmmo_wm1_rm_exp1=allresults[5,3],tmmo_wm1_rm_Weibull1=allresults[5,7],tmmo_wm1_qm_exp1=allresults[6,3],tmmo_wm1_qm_Weibull1=allresults[6,7],
+               tmmo_wm2_rm_exp1=allresults[7,3],tmmo_wm2_rm_Weibull1=allresults[7,7],tmmo_wm2_qm_exp1=allresults[8,3],tmmo_wm2_qm_Weibull1=allresults[8,7],
+               tmmo_tm1_rm_exp1=allresults[9,3],tmmo_tm1_rm_Weibull1=allresults[9,7],tmmo_tm1_qm_exp1=allresults[10,3],tmmo_tm1_qm_Weibull1=allresults[10,7],
+               tmmo_tm2_rm_exp1=allresults[11,3],tmmo_tm2_rm_Weibull1=allresults[11,7],tmmo_tm2_qm_exp1=allresults[12,3],tmmo_tm2_qm_Weibull1=allresults[12,7],
+               tmmo_tm3_rm_exp1=allresults[13,3],tmmo_tm3_rm_Weibull1=allresults[13,7],tmmo_tm3_qm_exp1=allresults[14,3],tmmo_tm3_qm_Weibull1=allresults[14,7],
                
-               fmmoraw=fmmoraw,fmmo_BM_rm_exp1=fmmo_BM_rm_exp1,fmmo_BM_rm_Weibull1=fmmo_BM_rm_Weibull1,fmmo_BM_qm_exp1=fmmo_BM_qm_exp1,fmmo_BM_qm_Weibull1=fmmo_BM_qm_Weibull1,
-               fmmo_sqm_rm_exp1=fmmo_sqm_rm_exp1,fmmo_sqm_rm_Weibull1=fmmo_sqm_rm_Weibull1,fmmo_sqm_qm_exp1=fmmo_sqm_qm_exp1,fmmo_sqm_qm_Weibull1=fmmo_sqm_qm_Weibull1,
-               fmmo_wm1_rm_exp1=fmmo_wm1_rm_exp1,fmmo_wm1_rm_Weibull1=fmmo_wm1_rm_Weibull1,fmmo_wm1_qm_exp1=fmmo_wm1_qm_exp1,fmmo_wm1_qm_Weibull1=fmmo_wm1_qm_Weibull1,
-               fmmo_wm2_rm_exp1=fmmo_wm2_rm_exp1,fmmo_wm2_rm_Weibull1=fmmo_wm2_rm_Weibull1,fmmo_wm2_qm_exp1=fmmo_wm2_qm_exp1,fmmo_wm2_qm_Weibull1=fmmo_wm2_qm_Weibull1,
-               fmmo_tm1_rm_exp1=fmmo_tm1_rm_exp1,fmmo_tm1_rm_Weibull1=fmmo_tm1_rm_Weibull1,fmmo_tm1_qm_exp1=fmmo_tm1_qm_exp1,fmmo_tm1_qm_Weibull1=fmmo_tm1_qm_Weibull1,
-               fmmo_tm2_rm_exp1=fmmo_tm2_rm_exp1,fmmo_tm2_rm_Weibull1=fmmo_tm2_rm_Weibull1,fmmo_tm2_qm_exp1=fmmo_tm2_qm_exp1,fmmo_tm2_qm_Weibull1=fmmo_tm2_qm_Weibull1,
-               fmmo_tm3_rm_exp1=fmmo_tm3_rm_exp1,fmmo_tm3_rm_Weibull1=fmmo_tm3_rm_Weibull1,fmmo_tm3_qm_exp1=fmmo_tm3_qm_exp1,fmmo_tm3_qm_Weibull1=fmmo_tm3_qm_Weibull1,
+               fmmoraw=fmmoraw,fmmo_BM_rm_exp1=allresults[1,4],fmmo_BM_rm_Weibull1=allresults[1,8],fmmo_BM_qm_exp1=allresults[2,4],fmmo_BM_qm_Weibull1=allresults[2,8],
+               fmmo_sqm_rm_exp1=allresults[3,4],fmmo_sqm_rm_Weibull1=allresults[3,8],fmmo_sqm_qm_exp1=allresults[4,4],fmmo_sqm_qm_Weibull1=allresults[4,8],
+               fmmo_wm1_rm_exp1=allresults[5,4],fmmo_wm1_rm_Weibull1=allresults[5,8],fmmo_wm1_qm_exp1=allresults[6,4],fmmo_wm1_qm_Weibull1=allresults[6,8],
+               fmmo_wm2_rm_exp1=allresults[7,4],fmmo_wm2_rm_Weibull1=allresults[7,8],fmmo_wm2_qm_exp1=allresults[8,4],fmmo_wm2_qm_Weibull1=allresults[8,8],
+               fmmo_tm1_rm_exp1=allresults[9,4],fmmo_tm1_rm_Weibull1=allresults[9,8],fmmo_tm1_qm_exp1=allresults[10,4],fmmo_tm1_qm_Weibull1=allresults[10,8],
+               fmmo_tm2_rm_exp1=allresults[11,4],fmmo_tm2_rm_Weibull1=allresults[11,8],fmmo_tm2_qm_exp1=allresults[12,4],fmmo_tm2_qm_Weibull1=allresults[12,8],
+               fmmo_tm3_rm_exp1=allresults[13,4],fmmo_tm3_rm_Weibull1=allresults[13,8],fmmo_tm3_qm_exp1=allresults[14,4],fmmo_tm3_qm_Weibull1=allresults[14,8],
                
                sdall=sdall)
   #finallall<-c(HL1=HL1,mmm1raw=mmm1raw,mmm1exp1=mmm1exp1,mmm1exp2=mmm1exp2,mmm1Weibull1=mmm1Weibull1,mmm1Weibull2=mmm1Weibull2,varmoraw=varmoraw,varmoexp1=varmoexp1,varmoexp2=varmoexp2,varmoWeibull1=varmoWeibull1,varmoWeibull2=varmoWeibull2,tmmoraw=tmmoraw,tmmoexp1=tmmoexp1,tmmoexp2=tmmoexp2,tmmoWeibull1=tmmoWeibull1,tmmoWeibull2=tmmoWeibull2,fmmoraw=fmmoraw,fmmoexp1=fmmoexp1,fmmoexp2=fmmoexp2,fmmoWeibull1=fmmoWeibull1,fmmoWeibull2=fmmoWeibull2,sdall=sdall)
   return(finallall)
 }
 
-#set the convergence criterion
-criterionset=1/20
+#set the stop criterion
+criterionset=1e-06
 
 kurtWeibull<- read.csv(("kurtWeibull_28260.csv"))
 
@@ -1484,6 +952,7 @@ unibatchran<-matrix(SFMT(samplesize*batchsize),ncol=batchsize)
 unibatch<-colSort(unibatchran, descend = FALSE, stable = FALSE, parallel = TRUE)
 
 #Then, start the Monte Simulation
+
 simulatedbatchWeibull_bias_Monte<-foreach(batchnumber =c((1:length(allkurtWeibull))), .combine = 'rbind') %dopar% {
   library(Rfast)
   if (!require("foreach")) install.packages("foreach")
@@ -1685,3 +1154,4 @@ simulatedbatchWeibull_bias_Monte_SE<-foreach(batchnumber =c((1:length(allkurtWei
 }
 
 write.csv(simulatedbatchWeibull_bias_Monte_SE,paste("ABSSE_w_Weibull_SWA_asymptotic_error.csv", sep = ","), row.names = FALSE)
+
